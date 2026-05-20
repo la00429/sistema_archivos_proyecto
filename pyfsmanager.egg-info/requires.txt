@@ -1,0 +1,4 @@
+colorama>=0.4.6
+
+[win32]
+pywin32>=306
