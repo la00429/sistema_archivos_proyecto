@@ -1,6 +1,7 @@
 import os
 import sys
 import stat
+import subprocess
 
 # Conditionally import Windows dependencies
 if sys.platform == 'win32':
@@ -182,9 +183,17 @@ def get_file_permissions(path: str) -> FilePermissions:
     if sys.platform == 'win32' and HAS_WIN32:
         try:
             return get_windows_permissions(path)
-        except Exception:
+        except Exception as e:
             # Fall back to standard python stat on failure
-            pass
+            import warnings
+            warnings.warn(f"get_windows_permissions (pywin32) falló para '{path}': {e}. Usando stat como fallback.")
+    # If on Windows and we don't have pywin32, try icacls as a best-effort
+    if sys.platform == 'win32' and not HAS_WIN32:
+        try:
+            return get_windows_permissions_icacls(path)
+        except Exception as e:
+            import warnings
+            warnings.warn(f"get_windows_permissions_icacls falló para '{path}': {e}. Usando stat como fallback.")
 
     # POSIX or fallback
     st = os.stat(path)
@@ -209,9 +218,18 @@ def set_file_permissions(path: str, permissions_raw) -> None:
         try:
             set_windows_permissions(path, perms)
             return
-        except Exception:
+        except Exception as e:
             # Fall back to standard python chmod on failure
-            pass
+            import warnings
+            warnings.warn(f"set_windows_permissions (pywin32) falló para '{path}': {e}. Usando os.chmod como fallback.")
+    # Try icacls as a fallback on Windows when pywin32 is unavailable
+    if sys.platform == 'win32' and not HAS_WIN32:
+        try:
+            set_windows_permissions_icacls(path, perms)
+            return
+        except Exception as e:
+            import warnings
+            warnings.warn(f"set_windows_permissions_icacls falló para '{path}': {e}. Usando os.chmod como fallback.")
 
     # POSIX or fallback
     os.chmod(path, perms.to_octal())
@@ -341,3 +359,69 @@ def set_windows_permissions(path: str, perms: FilePermissions) -> None:
     )
     sd_new.SetSecurityDescriptorDacl(1, dacl, 0)
     win32security.SetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION, sd_new)
+
+
+# --- icacls fallback implementations (best-effort when pywin32 unavailable) ---
+def _rwx_to_icacls_mask(rwx: str) -> str:
+    # Map rwx to icacls style: R, W, M (modify) or RX
+    flags = []
+    if 'r' in rwx:
+        flags.append('R')
+    if 'w' in rwx:
+        flags.append('M')
+    if 'x' in rwx:
+        flags.append('X')
+    # icacls uses generic flags; 'M' (modify) approximates write
+    return ''.join(flags) or 'R'
+
+def set_windows_permissions_icacls(path: str, perms: FilePermissions) -> None:
+    # Apply ACLs using icacls for current user and Everyone
+    user = os.getlogin()
+    # Build icacls strings
+    user_mask = _rwx_to_icacls_mask(perms.user)
+    everyone_mask = _rwx_to_icacls_mask(perms.other)
+
+    cmds = []
+    # Grant permissions to user
+    cmds.append(["icacls", path, "/grant", f"{user}:({user_mask})"]) 
+    # Replace Everyone permissions
+    cmds.append(["icacls", path, "/grant", f"Everyone:({everyone_mask})"]) 
+
+    for cmd in cmds:
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            raise OSError(f"icacls failed: {res.stderr.strip() or res.stdout.strip()}")
+
+def get_windows_permissions_icacls(path: str) -> FilePermissions:
+    # Query icacls and do a best-effort parse for current user and Everyone
+    try:
+        proc = subprocess.run(["icacls", path], capture_output=True, text=True)
+        out = proc.stdout + proc.stderr
+    except FileNotFoundError:
+        raise
+
+    # Default to readable/writable for user if parsing fails
+    user_rwx = 'rwx'
+    group_rwx = 'r-x'
+    everyone_rwx = 'r--'
+
+    # Try to find Everyone: or BUILTIN\Users: entries
+    for line in out.splitlines():
+        if ':' not in line:
+            continue
+        # Example: "C:\path\to\file NT AUTHORITY\\SYSTEM:(I)(F)"
+        if 'Everyone' in line or 'BUILTIN\\Users' in line:
+            # crude parse for (R) (M) (F) (RX)
+            if '(F)' in line or '(M)' in line:
+                everyone_rwx = 'rw-'
+            elif '(R)' in line:
+                everyone_rwx = 'r--'
+            elif '(RX)' in line:
+                everyone_rwx = 'r-x'
+    # For user, make it at least read/write if file is writable
+    if os.access(path, os.R_OK):
+        user_rwx = 'r--'
+    if os.access(path, os.W_OK):
+        user_rwx = 'rw-'
+
+    return FilePermissions(user_rwx, group_rwx, everyone_rwx)

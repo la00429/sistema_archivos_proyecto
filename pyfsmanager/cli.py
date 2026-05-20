@@ -12,6 +12,7 @@ from colorama import Fore, Style
 from .manager import FSManager
 from .metadata import FileMetadata
 from .permissions import FilePermissions
+from .utils import detect_file_type, detect_encoding
 
 # Initialize colorama
 colorama.init(autoreset=True)

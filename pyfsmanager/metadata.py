@@ -4,6 +4,7 @@ import stat
 import datetime
 from .permissions import FilePermissions, get_file_permissions
 from .links import is_junction, is_symlink, read_link
+import warnings
 
 # Conditionally import Windows dependencies
 if sys.platform == 'win32':
@@ -153,7 +154,8 @@ def set_file_times(path: str, atime: float = None, mtime: float = None, birthtim
                 win32file.CloseHandle(handle)
         except Exception as e:
             # Fall back to os.utime for atime/mtime if win32 fails
-            pass
+            warnings.warn(f"win32 SetFileTime falló para '{path}': {e}. Usando os.utime como fallback.")
+            
 
     # If we are on Linux or win32 failed/has no pywin32, we can set atime and mtime
     if atime is not None or mtime is not None:
