@@ -15,6 +15,7 @@ pyfsmanager.egg-info/entry_points.txt
 pyfsmanager.egg-info/requires.txt
 pyfsmanager.egg-info/top_level.txt
 tests/__init__.py
+tests/test_cli.py
 tests/test_links.py
 tests/test_manager.py
 tests/test_metadata.py

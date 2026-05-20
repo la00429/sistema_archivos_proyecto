@@ -630,11 +630,11 @@ class PyFSApp(tk.Tk):
             for item in items:
                 p = os.path.join(self.current_dir, item)
                 try:
-                        meta = FSManager.get_metadata(p)
-                        item_metas.append(meta)
-                    except Exception as e:
-                        # Log failures to retrieve metadata but continue listing
-                        self.log_status(f"Fallo al obtener metadatos de '{p}': {e}", is_error=True)
+                    meta = FSManager.get_metadata(p)
+                    item_metas.append(meta)
+                except Exception as e:
+                    # Log failures to retrieve metadata but continue listing
+                    self.log_status(f"Fallo al obtener metadatos de '{p}': {e}", is_error=True)
 
             # Sort items: directory, junction, symlink, others... then alphabetically
             def sort_key(meta: FileMetadata):
