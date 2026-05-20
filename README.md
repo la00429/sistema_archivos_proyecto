@@ -16,8 +16,13 @@ Gestor de sistemas de archivos en Python con detección automática de plataform
 ## Requisitos
 
 - Python 3.9+
-- Windows: Windows 10/11 o Server 2016+ (para symlinks sin admin)
-- Linux: cualquier distribución con kernel 4.x+
+- Módulo `tkinter` para la GUI (suele venir con la instalación de Python en Windows/macOS; en Linux puede requerir un paquete adicional).
+- En Windows, para aplicar cambios avanzados de permisos se recomienda instalar `pywin32` (opcional); si no está disponible se usan utilidades nativas (`icacls`) en modo "best-effort".
+
+Notas por plataforma:
+
+- Windows: Windows 10/11 o Server 2016+. Para crear symlinks sin privilegios puedes habilitar el modo desarrollador (Settings → For developers) o ejecutar el shell con permisos elevados. Las junctions (mklink /J) se usan como alternativa donde aplique.
+- Linux/macOS: cualquier distribución moderna con Python 3.9+ y soporte estándar de POSIX.
 
 ## Instalación
 
@@ -35,20 +40,32 @@ source venv/bin/activate
 # Activar (Windows PowerShell)
 venv\Scripts\Activate.ps1
 
+# Activar (Windows CMD)
+venv\Scripts\activate.bat
+
 # Instalar dependencias y paquete en modo desarrollo
 python -m pip install -r requirements.txt
 python -m pip install -e .
+
+# (Opcional) En Windows, instalar pywin32 para mejor manejo de ACLs
+python -m pip install pywin32
+
+# Nota: si no deseas instalar el paquete en modo editable, puedes
+# ejecutar las interfaces usando el flag -m (ver secciones siguientes).
 ```
 
 ## Uso de la Interfaz de Línea de Comandos (CLI)
 
 PyFSManager incluye una interfaz interactiva tipo shell con autocompletado, colores y formato claro de salida.
 
-Para iniciarla, ejecuta:
+Para iniciarla, ejecuta (desde el entorno virtual o instalando el paquete):
+
+Usando el módulo:
 ```bash
+
 python -m pyfsmanager.cli
 ```
-o mediante el comando registrado:
+Si instalaste el paquete en modo editable o desde PyPI, también está disponible el entrypoint:
 ```bash
 pyfs
 ```
@@ -77,11 +94,13 @@ pyfs
 
 La interfaz gráfica ofrece un diseño oscuro moderno para gestionar visualmente tus archivos.
 
-Para iniciarla, ejecuta:
+Para iniciarla, ejecuta (desde el entorno virtual o paquete instalado):
+
+Usando el módulo:
 ```bash
 python -m pyfsmanager.gui
 ```
-o mediante el comando registrado:
+O mediante el entrypoint si instalaste el paquete:
 ```bash
 pyfs-gui
 ```
