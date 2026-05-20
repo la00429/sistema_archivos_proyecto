@@ -18,6 +18,16 @@ if sys.platform == 'win32':
     except Exception:
         pass
 
+def format_size(bytes_size: int) -> str:
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if bytes_size < 1024:
+            return f"{bytes_size:.1f} {unit}" if unit != 'B' else f"{bytes_size} B"
+        bytes_size /= 1024
+    return f"{bytes_size:.1f} PB"
+
+def format_time(ts: float) -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
+
 class FileEditorWindow(tk.Toplevel):
     """
     Built-in Text Editor / Hex Viewer dialog.
