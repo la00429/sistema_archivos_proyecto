@@ -371,6 +371,14 @@ class PyFSApp(tk.Tk):
         self.entry_path.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10, pady=10)
         self.entry_path.bind("<Return>", lambda e: self.go_to_path(self.path_var.get()))
 
+        # Search / Filter Entry
+        self.filter_var = tk.StringVar(value='')
+        self.entry_search = ttk.Entry(top_bar, textvariable=self.filter_var, width=30)
+        self.entry_search.pack(side=tk.RIGHT, padx=10, pady=10)
+        self.entry_search.insert(0, '')
+        self.entry_search.bind("<Return>", lambda e: self.load_directory(self.current_dir))
+        self.entry_search.bind("<KeyRelease>", lambda e: self.load_directory(self.current_dir))
+
         # Go Button
         btn_go = ttk.Button(top_bar, text="Ir ➔", width=6, command=lambda: self.go_to_path(self.path_var.get()))
         btn_go.pack(side=tk.LEFT, padx=10, pady=10)
@@ -458,6 +466,14 @@ class PyFSApp(tk.Tk):
 
         self.tree.bind("<<TreeviewSelect>>", self.on_item_select)
         self.tree.bind("<Double-1>", self.on_item_double_click)
+        # Context menu (right click)
+        self.tree.bind("<Button-3>", self.on_tree_right_click)
+
+        # Keyboard shortcuts
+        self.bind('<Control-r>', lambda e: self.refresh())
+        self.bind('<Control-n>', lambda e: self.action_touch())
+        self.bind('<Control-Shift-N>', lambda e: self.action_mkdir())
+        self.bind('<Control-f>', lambda e: self.entry_search.focus_set())
 
         # 3. Right Details & Actions Panel
         right_panel = tk.Frame(main_pane, bg='#252526', width=280)
@@ -614,10 +630,11 @@ class PyFSApp(tk.Tk):
             for item in items:
                 p = os.path.join(self.current_dir, item)
                 try:
-                    meta = FSManager.get_metadata(p)
-                    item_metas.append(meta)
-                except Exception:
-                    pass
+                        meta = FSManager.get_metadata(p)
+                        item_metas.append(meta)
+                    except Exception as e:
+                        # Log failures to retrieve metadata but continue listing
+                        self.log_status(f"Fallo al obtener metadatos de '{p}': {e}", is_error=True)
 
             # Sort items: directory, junction, symlink, others... then alphabetically
             def sort_key(meta: FileMetadata):
@@ -634,6 +651,11 @@ class PyFSApp(tk.Tk):
                 elif meta.type in ('symlink', 'junction'): prefix = "🔗 "
                 elif 'x' in meta.permissions.user and meta.type == 'regular': prefix = "⚙️ "
                 else: prefix = "📄 "
+
+                # Apply search filter if present
+                filt = self.filter_var.get().strip().lower()
+                if filt and filt not in meta.name.lower():
+                    continue
 
                 display_name = prefix + meta.name
                 size_str = format_size(meta.size) if meta.type == 'regular' else '-'
@@ -752,6 +774,35 @@ class PyFSApp(tk.Tk):
                 self.action_edit_file()
         elif meta.type == 'regular':
             self.action_edit_file()
+
+    def on_tree_right_click(self, event):
+        # Identify the row under cursor
+        row_id = self.tree.identify_row(event.y)
+        if not row_id:
+            return
+        # Select it
+        self.tree.selection_set(row_id)
+        self.selected_item = row_id
+        try:
+            self.selected_meta = FSManager.get_metadata(row_id)
+        except Exception:
+            self.selected_meta = None
+
+        # Build context menu
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Abrir / Editar", command=self.action_edit_file)
+        menu.add_command(label="Copiar", command=self.action_copy)
+        menu.add_command(label="Mover", command=self.action_move)
+        menu.add_command(label="Renombrar", command=self.action_rename)
+        menu.add_separator()
+        menu.add_command(label="Eliminar", command=self.action_delete)
+        menu.add_separator()
+        menu.add_command(label="Crear Enlace...", command=self.action_create_link)
+
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     def go_to_parent(self):
         parent = os.path.dirname(self.current_dir)
