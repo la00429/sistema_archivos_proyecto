@@ -10,6 +10,19 @@ from .manager import FSManager
 from .metadata import FileMetadata
 from .permissions import FilePermissions
 
+# Theme colors (centralized for easier tweaks)
+THEME_BG = '#1e1e1e'
+PANEL_BG = '#252526'
+PANEL_ALT = '#2d2d2d'
+SURFACE = '#2d2d2d'
+ACCENT = '#007acc'
+ON_ACCENT = '#ffffff'
+MUTED = '#888888'
+HEADER_BG = '#3c3c3c'
+STATUS_BG = '#111111'
+STATUS_FG = '#cccccc'
+DISABLED_FG = '#555555'
+
 # Try to enable high DPI awareness on Windows to prevent blurry GUI
 if sys.platform == 'win32':
     try:
@@ -39,7 +52,7 @@ class FileEditorWindow(tk.Toplevel):
         self.filename = os.path.basename(filepath)
         self.title(f"Editor - {self.filename}")
         self.geometry("800x600")
-        self.configure(bg='#1e1e1e')
+        self.configure(bg=THEME_BG)
         
         # Read contents
         try:
@@ -58,14 +71,14 @@ class FileEditorWindow(tk.Toplevel):
 
     def setup_ui(self):
         # Header Info
-        header_frame = tk.Frame(self, bg='#2d2d2d', height=40)
+        header_frame = tk.Frame(self, bg=PANEL_ALT, height=40)
         header_frame.pack(fill=tk.X)
         
         type_lbl = tk.Label(
             header_frame, 
             text=f"Archivo: {self.filename} | Tipo: {self.file_type.upper()} | Codificación: {self.encoding.upper()}", 
-            bg='#2d2d2d', 
-            fg='#ffffff',
+            bg=PANEL_ALT, 
+            fg=ON_ACCENT,
             font=('Segoe UI', 10, 'bold')
         )
         type_lbl.pack(side=tk.LEFT, padx=10, pady=10)
@@ -73,9 +86,9 @@ class FileEditorWindow(tk.Toplevel):
         # Content Text Area
         self.txt_area = tk.Text(
             self, 
-            bg='#1e1e1e', 
-            fg='#ffffff', 
-            insertbackground='white',
+            bg=THEME_BG, 
+            fg=ON_ACCENT, 
+            insertbackground=ON_ACCENT,
             font=('Consolas', 11),
             wrap=tk.WORD if self.file_type == 'text' else tk.NONE,
             padx=10,
@@ -98,7 +111,7 @@ class FileEditorWindow(tk.Toplevel):
             self.txt_area.configure(state=tk.DISABLED)
             
             # Bottom action bar (close only)
-            btn_frame = tk.Frame(self, bg='#2d2d2d')
+            btn_frame = tk.Frame(self, bg=PANEL_ALT)
             btn_frame.pack(fill=tk.X)
             close_btn = ttk.Button(btn_frame, text="Cerrar", command=self.destroy)
             close_btn.pack(side=tk.RIGHT, padx=10, pady=10)
@@ -107,7 +120,7 @@ class FileEditorWindow(tk.Toplevel):
             self.txt_area.insert(tk.END, self.content)
             
             # Bottom action bar (Save/Cancel)
-            btn_frame = tk.Frame(self, bg='#2d2d2d')
+            btn_frame = tk.Frame(self, bg=PANEL_ALT)
             btn_frame.pack(fill=tk.X)
             
             save_btn = ttk.Button(btn_frame, text="Guardar", command=self.save_file)
@@ -143,7 +156,7 @@ class EditTimesDialog(tk.Toplevel):
         self.title("Modificar Marcas de Tiempo")
         self.geometry("450x250")
         self.resizable(False, False)
-        self.configure(bg='#1e1e1e')
+        self.configure(bg=THEME_BG)
         self.transient(parent)
         self.grab_set()
 
@@ -166,26 +179,26 @@ class EditTimesDialog(tk.Toplevel):
 
     def setup_ui(self):
         # Header Label
-        lbl = tk.Label(self, text="Editar marcas de tiempo", font=('Segoe UI', 12, 'bold'), bg='#1e1e1e', fg='#ffffff')
+        lbl = tk.Label(self, text="Editar marcas de tiempo", font=('Segoe UI', 12, 'bold'), bg=THEME_BG, fg=ON_ACCENT)
         lbl.pack(pady=10)
 
-        grid_frame = tk.Frame(self, bg='#1e1e1e')
+        grid_frame = tk.Frame(self, bg=THEME_BG)
         grid_frame.pack(padx=20, fill=tk.X)
 
         # Atime
-        tk.Label(grid_frame, text="Acceso (atime):", bg='#1e1e1e', fg='#ffffff').grid(row=0, column=0, sticky='w', pady=5)
+        tk.Label(grid_frame, text="Acceso (atime):", bg=THEME_BG, fg=ON_ACCENT).grid(row=0, column=0, sticky='w', pady=5)
         self.entry_atime = ttk.Entry(grid_frame, width=30)
         self.entry_atime.insert(0, self.format_ts(self.meta.atime))
         self.entry_atime.grid(row=0, column=1, pady=5, padx=10)
 
         # Mtime
-        tk.Label(grid_frame, text="Modificación (mtime):", bg='#1e1e1e', fg='#ffffff').grid(row=1, column=0, sticky='w', pady=5)
+        tk.Label(grid_frame, text="Modificación (mtime):", bg=THEME_BG, fg=ON_ACCENT).grid(row=1, column=0, sticky='w', pady=5)
         self.entry_mtime = ttk.Entry(grid_frame, width=30)
         self.entry_mtime.insert(0, self.format_ts(self.meta.mtime))
         self.entry_mtime.grid(row=1, column=1, pady=5, padx=10)
 
         # Birthtime (Only editable on Windows)
-        tk.Label(grid_frame, text="Creación (birthtime):", bg='#1e1e1e', fg='#ffffff').grid(row=2, column=0, sticky='w', pady=5)
+        tk.Label(grid_frame, text="Creación (birthtime):", bg=THEME_BG, fg=ON_ACCENT).grid(row=2, column=0, sticky='w', pady=5)
         self.entry_birth = ttk.Entry(grid_frame, width=30)
         if self.meta.birthtime:
             self.entry_birth.insert(0, self.format_ts(self.meta.birthtime))
@@ -195,7 +208,7 @@ class EditTimesDialog(tk.Toplevel):
         self.entry_birth.grid(row=2, column=1, pady=5, padx=10)
 
         # Buttons
-        btn_frame = tk.Frame(self, bg='#1e1e1e')
+        btn_frame = tk.Frame(self, bg=THEME_BG)
         btn_frame.pack(pady=20, side=tk.BOTTOM, fill=tk.X)
 
         save_btn = ttk.Button(btn_frame, text="Guardar", command=self.save)
@@ -231,7 +244,7 @@ class CreateLinkDialog(tk.Toplevel):
         self.title("Crear Enlace / Link")
         self.geometry("500x230")
         self.resizable(False, False)
-        self.configure(bg='#1e1e1e')
+        self.configure(bg=THEME_BG)
         self.transient(parent)
         self.grab_set()
 
@@ -239,22 +252,22 @@ class CreateLinkDialog(tk.Toplevel):
 
     def setup_ui(self):
         # Header Label
-        lbl = tk.Label(self, text="Crear nuevo enlace (Link)", font=('Segoe UI', 12, 'bold'), bg='#1e1e1e', fg='#ffffff')
+        lbl = tk.Label(self, text="Crear nuevo enlace (Link)", font=('Segoe UI', 12, 'bold'), bg=THEME_BG, fg=ON_ACCENT)
         lbl.pack(pady=10)
 
-        grid_frame = tk.Frame(self, bg='#1e1e1e')
+        grid_frame = tk.Frame(self, bg=THEME_BG)
         grid_frame.pack(padx=20, fill=tk.X)
 
         # Target (readonly)
-        tk.Label(grid_frame, text="Destino (Target):", bg='#1e1e1e', fg='#ffffff').grid(row=0, column=0, sticky='w', pady=5)
-        lbl_target = tk.Label(grid_frame, text=self.target_path, fg='#007acc', bg='#1e1e1e', anchor='w', justify='left')
+        tk.Label(grid_frame, text="Destino (Target):", bg=THEME_BG, fg=ON_ACCENT).grid(row=0, column=0, sticky='w', pady=5)
+        lbl_target = tk.Label(grid_frame, text=self.target_path, fg=ACCENT, bg=THEME_BG, anchor='w', justify='left')
         lbl_target.grid(row=0, column=1, pady=5, padx=10, sticky='w')
 
         # Link Type
-        tk.Label(grid_frame, text="Tipo de Enlace:", bg='#1e1e1e', fg='#ffffff').grid(row=1, column=0, sticky='w', pady=5)
+        tk.Label(grid_frame, text="Tipo de Enlace:", bg=THEME_BG, fg=ON_ACCENT).grid(row=1, column=0, sticky='w', pady=5)
         self.link_type_var = tk.StringVar(value="symlink")
         
-        radio_frame = tk.Frame(grid_frame, bg='#1e1e1e')
+        radio_frame = tk.Frame(grid_frame, bg=THEME_BG)
         radio_frame.grid(row=1, column=1, pady=5, padx=10, sticky='w')
         
         ttk.Radiobutton(radio_frame, text="Simbólico (Symlink)", variable=self.link_type_var, value="symlink").pack(side=tk.LEFT, padx=5)
@@ -264,13 +277,13 @@ class CreateLinkDialog(tk.Toplevel):
             ttk.Radiobutton(radio_frame, text="Unión (Junction)", variable=self.link_type_var, value="junction").pack(side=tk.LEFT, padx=5)
 
         # Link Name
-        tk.Label(grid_frame, text="Nombre del Enlace:", bg='#1e1e1e', fg='#ffffff').grid(row=2, column=0, sticky='w', pady=5)
+        tk.Label(grid_frame, text="Nombre del Enlace:", bg=THEME_BG, fg=ON_ACCENT).grid(row=2, column=0, sticky='w', pady=5)
         self.entry_name = ttk.Entry(grid_frame, width=40)
         self.entry_name.insert(0, self.target_path + "_link")
         self.entry_name.grid(row=2, column=1, pady=5, padx=10, sticky='w')
 
         # Buttons
-        btn_frame = tk.Frame(self, bg='#1e1e1e')
+        btn_frame = tk.Frame(self, bg=THEME_BG)
         btn_frame.pack(pady=20, side=tk.BOTTOM, fill=tk.X)
 
         create_btn = ttk.Button(btn_frame, text="Crear", command=self.create)
@@ -305,7 +318,7 @@ class PyFSApp(tk.Tk):
         self.title("PyFSManager - Manejador de Sistemas de Archivos")
         self.geometry("1100x700")
         self.minimum_size = (900, 600)
-        self.configure(bg='#1e1e1e')
+        self.configure(bg=THEME_BG)
         
         self.current_dir = os.path.abspath(os.getcwd())
         self.selected_item: Optional[str] = None
@@ -320,41 +333,42 @@ class PyFSApp(tk.Tk):
         self.style.theme_use('clam')
         
         # Configure Colors
-        self.style.configure('.', background='#1e1e1e', foreground='#ffffff', font=('Segoe UI', 10))
-        self.style.configure('TFrame', background='#1e1e1e')
-        
+        self.style.configure('.', background=THEME_BG, foreground=ON_ACCENT, font=('Segoe UI', 10))
+        self.style.configure('TFrame', background=THEME_BG)
+
         # Sidebar
-        self.style.configure('Sidebar.TFrame', background='#252526')
-        
+        self.style.configure('Sidebar.TFrame', background=PANEL_BG)
+
         # Labels
-        self.style.configure('TLabel', background='#1e1e1e', foreground='#ffffff')
-        self.style.configure('Title.TLabel', font=('Segoe UI', 12, 'bold'), foreground='#007acc')
-        self.style.configure('Header.TLabel', font=('Segoe UI', 10, 'bold'), foreground='#007acc')
-        self.style.configure('Sidebar.TLabel', background='#252526', font=('Segoe UI', 10, 'bold'), foreground='#888888')
-        
+        self.style.configure('TLabel', background=THEME_BG, foreground=ON_ACCENT)
+        self.style.configure('Title.TLabel', font=('Segoe UI', 12, 'bold'), foreground=ACCENT)
+        self.style.configure('Header.TLabel', font=('Segoe UI', 10, 'bold'), foreground=ACCENT)
+        self.style.configure('Sidebar.TLabel', background=PANEL_BG, font=('Segoe UI', 10, 'bold'), foreground=MUTED)
+
         # Treeview
         self.style.configure('Treeview', 
-                             background='#2d2d2d', 
-                             foreground='#ffffff', 
-                             fieldbackground='#2d2d2d', 
+                             background=SURFACE, 
+                             foreground=ON_ACCENT, 
+                             fieldbackground=SURFACE, 
                              rowheight=26,
                              font=('Segoe UI', 10),
                              borderwidth=0)
-        self.style.map('Treeview', background=[('selected', '#007acc')])
-        self.style.configure('Treeview.Heading', background='#3c3c3c', foreground='#ffffff', font=('Segoe UI', 10, 'bold'))
+        # Ensure selected row has good contrast
+        self.style.map('Treeview', background=[('selected', ACCENT)], foreground=[('selected', ON_ACCENT)])
+        self.style.configure('Treeview.Heading', background=HEADER_BG, foreground=ON_ACCENT, font=('Segoe UI', 10, 'bold'))
 
         # Buttons
-        self.style.configure('TButton', background='#3c3c3c', foreground='#ffffff', borderwidth=0, font=('Segoe UI', 9))
+        self.style.configure('TButton', background=HEADER_BG, foreground=ON_ACCENT, borderwidth=0, font=('Segoe UI', 9))
         self.style.map('TButton', 
-                       background=[('active', '#007acc'), ('disabled', '#252526')],
-                       foreground=[('disabled', '#555555')])
-        
+                       background=[('active', ACCENT), ('disabled', PANEL_BG)],
+                       foreground=[('active', ON_ACCENT), ('disabled', DISABLED_FG)])
+
         # Address Bar
-        self.style.configure('Address.TEntry', fieldbackground='#2d2d2d', foreground='#ffffff', font=('Segoe UI', 10))
+        self.style.configure('Address.TEntry', fieldbackground=PANEL_ALT, foreground=ON_ACCENT, font=('Segoe UI', 10))
 
     def setup_ui(self):
         # --- Top Menu & Address Bar ---
-        top_bar = tk.Frame(self, bg='#2d2d2d', height=50)
+        top_bar = tk.Frame(self, bg=PANEL_ALT, height=50)
         top_bar.pack(side=tk.TOP, fill=tk.X)
 
         # Back (Parent) Button
@@ -384,18 +398,18 @@ class PyFSApp(tk.Tk):
         btn_go.pack(side=tk.LEFT, padx=10, pady=10)
 
         # --- Main Layout Splitter ---
-        main_pane = tk.PanedWindow(self, orient=tk.HORIZONTAL, bg='#3c3c3c', bd=0, sashwidth=4)
+        main_pane = tk.PanedWindow(self, orient=tk.HORIZONTAL, bg=HEADER_BG, bd=0, sashwidth=4)
         main_pane.pack(fill=tk.BOTH, expand=True)
 
         # 1. Left Sidebar (Bookmarks / Directory tree shortcuts)
-        sidebar = tk.Frame(main_pane, bg='#252526', width=180)
+        sidebar = tk.Frame(main_pane, bg=PANEL_BG, width=180)
         sidebar.pack(fill=tk.BOTH, expand=True)
         main_pane.add(sidebar)
         
         lbl_shortcuts = ttk.Label(sidebar, text="ACCESOS RÁPIDOS", style='Sidebar.TLabel')
         lbl_shortcuts.pack(anchor='w', padx=15, pady=(15, 5))
 
-        shortcuts_frame = tk.Frame(sidebar, bg='#252526')
+        shortcuts_frame = tk.Frame(sidebar, bg=PANEL_BG)
         shortcuts_frame.pack(fill=tk.X, padx=10)
 
         # Sidebar Shortcuts buttons
@@ -404,22 +418,22 @@ class PyFSApp(tk.Tk):
                 shortcuts_frame, 
                 text=name, 
                 anchor='w', 
-                bg='#252526', 
-                fg='#ffffff',
+                bg=PANEL_BG, 
+                fg=ON_ACCENT,
                 relief=tk.FLAT,
                 bd=0,
                 padx=10,
                 pady=6,
                 font=('Segoe UI', 10),
-                activebackground='#007acc',
-                activeforeground='#ffffff'
+                activebackground=ACCENT,
+                activeforeground=ON_ACCENT
             )
             btn.configure(command=lambda: self.go_to_path(path_getter()))
             btn.pack(fill=tk.X, pady=2)
             
             # Hover effect
-            btn.bind("<Enter>", lambda e: btn.configure(bg='#3c3c3c') if btn['bg'] != '#007acc' else None)
-            btn.bind("<Leave>", lambda e: btn.configure(bg='#252526') if btn['bg'] != '#007acc' else None)
+            btn.bind("<Enter>", lambda e: btn.configure(bg=PANEL_ALT) if btn['bg'] != ACCENT else None)
+            btn.bind("<Leave>", lambda e: btn.configure(bg=PANEL_BG) if btn['bg'] != ACCENT else None)
 
         make_shortcut("📁 Espacio Trabajo", lambda: os.getcwd())
         make_shortcut("🏠 Inicio (Home)", lambda: os.path.expanduser("~"))
@@ -427,11 +441,11 @@ class PyFSApp(tk.Tk):
         make_shortcut("📄 Documentos", lambda: os.path.join(os.path.expanduser("~"), "Documents"))
 
         # 2. Center File list
-        center_frame = tk.Frame(main_pane, bg='#1e1e1e')
+        center_frame = tk.Frame(main_pane, bg=THEME_BG)
         main_pane.add(center_frame)
 
         # File List Actions Header (Touch, Mkdir)
-        actions_header = tk.Frame(center_frame, bg='#1e1e1e')
+        actions_header = tk.Frame(center_frame, bg=THEME_BG)
         actions_header.pack(fill=tk.X, padx=10, pady=5)
         
         btn_new_file = ttk.Button(actions_header, text="📄 Nuevo Archivo", command=self.action_touch)
@@ -441,7 +455,7 @@ class PyFSApp(tk.Tk):
         btn_new_folder.pack(side=tk.LEFT, padx=5)
 
         # File Treeview
-        tree_frame = tk.Frame(center_frame, bg='#1e1e1e')
+        tree_frame = tk.Frame(center_frame, bg=THEME_BG)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
         cols = ('name', 'type', 'size', 'mtime')
@@ -476,22 +490,22 @@ class PyFSApp(tk.Tk):
         self.bind('<Control-f>', lambda e: self.entry_search.focus_set())
 
         # 3. Right Details & Actions Panel
-        right_panel = tk.Frame(main_pane, bg='#252526', width=280)
+        right_panel = tk.Frame(main_pane, bg=PANEL_BG, width=280)
         right_panel.pack(fill=tk.BOTH, expand=True)
         main_pane.add(right_panel)
 
         self.setup_right_panel(right_panel)
 
         # --- Bottom Status Console Log ---
-        self.status_bar = tk.Text(self, bg='#111111', fg='#888888', height=4, font=('Consolas', 9), bd=0, padx=10, pady=5)
+        self.status_bar = tk.Text(self, bg=STATUS_BG, fg=STATUS_FG, height=4, font=('Consolas', 9), bd=0, padx=10, pady=5)
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
         self.log_status("Aplicación PyFSManager iniciada.")
 
     def setup_right_panel(self, parent):
         # Scrollable container for details panel in case screen is small
-        canvas = tk.Canvas(parent, bg='#252526', bd=0, highlightthickness=0)
+        canvas = tk.Canvas(parent, bg=PANEL_BG, bd=0, highlightthickness=0)
         scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scroll_frame = tk.Frame(canvas, bg='#252526')
+        scroll_frame = tk.Frame(canvas, bg=PANEL_BG)
 
         scroll_frame.bind(
             "<Configure>",
@@ -508,28 +522,28 @@ class PyFSApp(tk.Tk):
         # --- Section: Metadatos ---
         ttk.Label(scroll_frame, text="DETALLES", style='Header.TLabel').pack(anchor='w', padx=15, pady=(15, 5))
         
-        self.lbl_name = ttk.Label(scroll_frame, text="Ningún elemento seleccionado", font=('Segoe UI', 10, 'bold'), wraplength=250, justify='left', background='#252526')
+        self.lbl_name = ttk.Label(scroll_frame, text="Ningún elemento seleccionado", font=('Segoe UI', 10, 'bold'), wraplength=250, justify='left', background=PANEL_BG)
         self.lbl_name.pack(anchor='w', padx=15, pady=2)
         
-        self.lbl_type = ttk.Label(scroll_frame, text="Tipo: -", background='#252526')
+        self.lbl_type = ttk.Label(scroll_frame, text="Tipo: -", background=PANEL_BG)
         self.lbl_type.pack(anchor='w', padx=15, pady=2)
         
-        self.lbl_size = ttk.Label(scroll_frame, text="Tamaño: -", background='#252526')
+        self.lbl_size = ttk.Label(scroll_frame, text="Tamaño: -", background=PANEL_BG)
         self.lbl_size.pack(anchor='w', padx=15, pady=2)
         
-        self.lbl_link = ttk.Label(scroll_frame, text="", foreground='#007acc', background='#252526', wraplength=250, justify='left')
+        self.lbl_link = ttk.Label(scroll_frame, text="", foreground=ACCENT, background=PANEL_BG, wraplength=250, justify='left')
         self.lbl_link.pack(anchor='w', padx=15, pady=2)
 
         # --- Section: Tiempos ---
         ttk.Label(scroll_frame, text="MARCAS DE TIEMPO", style='Header.TLabel').pack(anchor='w', padx=15, pady=(15, 5))
         
-        self.lbl_atime = ttk.Label(scroll_frame, text="Acceso: -", background='#252526')
+        self.lbl_atime = ttk.Label(scroll_frame, text="Acceso: -", background=PANEL_BG)
         self.lbl_atime.pack(anchor='w', padx=15, pady=2)
-        self.lbl_mtime = ttk.Label(scroll_frame, text="Modif: -", background='#252526')
+        self.lbl_mtime = ttk.Label(scroll_frame, text="Modif: -", background=PANEL_BG)
         self.lbl_mtime.pack(anchor='w', padx=15, pady=2)
-        self.lbl_ctime = ttk.Label(scroll_frame, text="Cambio: -", background='#252526')
+        self.lbl_ctime = ttk.Label(scroll_frame, text="Cambio: -", background=PANEL_BG)
         self.lbl_ctime.pack(anchor='w', padx=15, pady=2)
-        self.lbl_birth = ttk.Label(scroll_frame, text="Creado: -", background='#252526')
+        self.lbl_birth = ttk.Label(scroll_frame, text="Creado: -", background=PANEL_BG)
         self.lbl_birth.pack(anchor='w', padx=15, pady=2)
 
         self.btn_edit_times = ttk.Button(scroll_frame, text="⏱ Editar Tiempos", command=self.action_edit_times, state=tk.DISABLED)
@@ -538,14 +552,14 @@ class PyFSApp(tk.Tk):
         # --- Section: Permisos ---
         ttk.Label(scroll_frame, text="PERMISOS (POSIX/ACL)", style='Header.TLabel').pack(anchor='w', padx=15, pady=(10, 5))
         
-        perms_frame = tk.Frame(scroll_frame, bg='#2d2d2d', padx=10, pady=10)
+        perms_frame = tk.Frame(scroll_frame, bg=SURFACE, padx=10, pady=10)
         perms_frame.pack(fill=tk.X, padx=15, pady=5)
 
         # Header Row
-        tk.Label(perms_frame, text="Rol", font=('Segoe UI', 9, 'bold'), bg='#2d2d2d', fg='#888888').grid(row=0, column=0, sticky='w')
-        tk.Label(perms_frame, text="R", font=('Segoe UI', 9, 'bold'), bg='#2d2d2d', fg='#888888').grid(row=0, column=1, padx=5)
-        tk.Label(perms_frame, text="W", font=('Segoe UI', 9, 'bold'), bg='#2d2d2d', fg='#888888').grid(row=0, column=2, padx=5)
-        tk.Label(perms_frame, text="X", font=('Segoe UI', 9, 'bold'), bg='#2d2d2d', fg='#888888').grid(row=0, column=3, padx=5)
+        tk.Label(perms_frame, text="Rol", font=('Segoe UI', 9, 'bold'), bg=SURFACE, fg=MUTED).grid(row=0, column=0, sticky='w')
+        tk.Label(perms_frame, text="R", font=('Segoe UI', 9, 'bold'), bg=SURFACE, fg=MUTED).grid(row=0, column=1, padx=5)
+        tk.Label(perms_frame, text="W", font=('Segoe UI', 9, 'bold'), bg=SURFACE, fg=MUTED).grid(row=0, column=2, padx=5)
+        tk.Label(perms_frame, text="X", font=('Segoe UI', 9, 'bold'), bg=SURFACE, fg=MUTED).grid(row=0, column=3, padx=5)
 
         # Variables for checkboxes
         self.chk_vars = {
@@ -557,14 +571,14 @@ class PyFSApp(tk.Tk):
         # Checkboxes
         roles = [('Usuario (u)', 'u', 1), ('Grupo (g)', 'g', 2), ('Otros (o)', 'o', 3)]
         for label, key, row in roles:
-            tk.Label(perms_frame, text=label, bg='#2d2d2d', fg='#ffffff', font=('Segoe UI', 9)).grid(row=row, column=0, sticky='w', pady=2)
+            tk.Label(perms_frame, text=label, bg=SURFACE, fg=ON_ACCENT, font=('Segoe UI', 9)).grid(row=row, column=0, sticky='w', pady=2)
             for i in range(3):
                 chk = tk.Checkbutton(
                     perms_frame, 
                     variable=self.chk_vars[key][i], 
-                    bg='#2d2d2d', 
-                    activebackground='#2d2d2d', 
-                    selectcolor='#1e1e1e',
+                    bg=SURFACE, 
+                    activebackground=SURFACE, 
+                    selectcolor=THEME_BG,
                     bd=0
                 )
                 chk.grid(row=row, column=i+1, pady=2)
@@ -575,7 +589,7 @@ class PyFSApp(tk.Tk):
         # --- Section: Acciones ---
         ttk.Label(scroll_frame, text="ACCIONES", style='Header.TLabel').pack(anchor='w', padx=15, pady=(15, 5))
         
-        actions_grid = tk.Frame(scroll_frame, bg='#252526')
+        actions_grid = tk.Frame(scroll_frame, bg=PANEL_BG)
         actions_grid.pack(fill=tk.X, padx=15, pady=5)
 
         self.btn_copy = ttk.Button(actions_grid, text="📄 Copiar", command=self.action_copy, state=tk.DISABLED)
@@ -678,7 +692,7 @@ class PyFSApp(tk.Tk):
         self.selected_item = None
         self.selected_meta = None
         
-        self.lbl_name.configure(text="Ningún elemento seleccionado", foreground='#ffffff')
+        self.lbl_name.configure(text="Ningún elemento seleccionado", foreground=ON_ACCENT)
         self.lbl_type.configure(text="Tipo: -")
         self.lbl_size.configure(text="Tamaño: -")
         self.lbl_link.configure(text="")
@@ -715,7 +729,7 @@ class PyFSApp(tk.Tk):
             meta = self.selected_meta
             
             # Update labels
-            self.lbl_name.configure(text=meta.name, foreground='#007acc')
+            self.lbl_name.configure(text=meta.name, foreground=ACCENT)
             self.lbl_type.configure(text=f"Tipo: {meta.type.upper()}")
             self.lbl_size.configure(text=f"Tamaño: {meta.size} bytes ({format_size(meta.size)})")
             
