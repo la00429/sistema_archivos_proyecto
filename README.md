@@ -62,6 +62,7 @@ Para iniciarla, ejecuta (desde el entorno virtual o instalando el paquete):
 
 Usando el módulo:
 ```bash
+
 python -m pyfsmanager.cli
 ```
 Si instalaste el paquete en modo editable o desde PyPI, también está disponible el entrypoint:
