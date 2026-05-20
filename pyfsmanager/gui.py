@@ -242,8 +242,10 @@ class CreateLinkDialog(tk.Toplevel):
         self.on_create = on_create_callback
         
         self.title("Crear Enlace / Link")
-        self.geometry("500x230")
-        self.resizable(False, False)
+        # Start with a reasonable size but allow horizontal resizing so long paths fit
+        self.geometry("560x220")
+        self.minsize(480, 180)
+        self.resizable(True, False)
         self.configure(bg=THEME_BG)
         self.transient(parent)
         self.grab_set()
@@ -256,12 +258,32 @@ class CreateLinkDialog(tk.Toplevel):
         lbl.pack(pady=10)
 
         grid_frame = tk.Frame(self, bg=THEME_BG)
-        grid_frame.pack(padx=20, fill=tk.X)
+        grid_frame.pack(padx=12, fill=tk.BOTH, expand=True)
+        # Make the second column expandable so entry and target label grow
+        grid_frame.columnconfigure(1, weight=1)
 
         # Target (readonly)
         tk.Label(grid_frame, text="Destino (Target):", bg=THEME_BG, fg=ON_ACCENT).grid(row=0, column=0, sticky='w', pady=5)
-        lbl_target = tk.Label(grid_frame, text=self.target_path, fg=ACCENT, bg=THEME_BG, anchor='w', justify='left')
-        lbl_target.grid(row=0, column=1, pady=5, padx=10, sticky='w')
+        lbl_target = tk.Label(grid_frame, text=self.target_path, fg=ACCENT, bg=THEME_BG, anchor='w', justify='left', cursor='hand2')
+        lbl_target.grid(row=0, column=1, pady=5, padx=(10,4), sticky='ew')
+        # Clicking the target copies the path to clipboard
+        def copy_target(e=None):
+            try:
+                self.clipboard_clear()
+                self.clipboard_append(self.target_path)
+                messagebox.showinfo("Copiado", "Ruta copiada al portapapeles.")
+            except Exception:
+                pass
+        lbl_target.bind("<Button-1>", copy_target)
+
+        # Adjust wraplength when dialog resizes so long paths wrap nicely
+        def on_configure(e):
+            try:
+                wrap = max(200, self.winfo_width() - 220)
+                lbl_target.configure(wraplength=wrap)
+            except Exception:
+                pass
+        self.bind('<Configure>', on_configure)
 
         # Link Type
         tk.Label(grid_frame, text="Tipo de Enlace:", bg=THEME_BG, fg=ON_ACCENT).grid(row=1, column=0, sticky='w', pady=5)
@@ -278,19 +300,27 @@ class CreateLinkDialog(tk.Toplevel):
 
         # Link Name
         tk.Label(grid_frame, text="Nombre del Enlace:", bg=THEME_BG, fg=ON_ACCENT).grid(row=2, column=0, sticky='w', pady=5)
-        self.entry_name = ttk.Entry(grid_frame, width=40)
+        # Use the dark entry style so the field matches the theme
+        self.entry_name = ttk.Entry(grid_frame, width=40, style='Address.TEntry')
         self.entry_name.insert(0, self.target_path + "_link")
-        self.entry_name.grid(row=2, column=1, pady=5, padx=10, sticky='w')
+        self.entry_name.grid(row=2, column=1, pady=5, padx=(10,4), sticky='ew')
+        self.entry_name.focus_set()
 
         # Buttons
         btn_frame = tk.Frame(self, bg=THEME_BG)
-        btn_frame.pack(pady=20, side=tk.BOTTOM, fill=tk.X)
+        btn_frame.pack(pady=12, side=tk.BOTTOM, fill=tk.X)
+        btn_frame.columnconfigure(0, weight=1)
 
-        create_btn = ttk.Button(btn_frame, text="Crear", command=self.create)
-        create_btn.pack(side=tk.RIGHT, padx=20)
+        # Place buttons on the right using grid to keep alignment when resized
+        create_btn = tk.Button(btn_frame, text="Crear", command=self.create,
+                       bg=ACCENT, fg=ON_ACCENT, activebackground='#005f99', activeforeground=ON_ACCENT,
+                       relief=tk.FLAT, bd=0, padx=12, pady=6)
+        create_btn.grid(row=0, column=1, sticky='e', padx=(8,20))
 
-        cancel_btn = ttk.Button(btn_frame, text="Cancelar", command=self.destroy)
-        cancel_btn.pack(side=tk.RIGHT, padx=5)
+        cancel_btn = tk.Button(btn_frame, text="Cancelar", command=self.destroy,
+                       bg=PANEL_ALT, fg=ON_ACCENT, activebackground=PANEL_BG, activeforeground=ON_ACCENT,
+                       relief=tk.FLAT, bd=0, padx=12, pady=6)
+        cancel_btn.grid(row=0, column=2, sticky='e', padx=(5,10))
 
     def create(self):
         ltype = self.link_type_var.get()
