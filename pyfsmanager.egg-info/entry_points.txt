@@ -1,0 +1,3 @@
+[console_scripts]
+pyfs = pyfsmanager.cli:main
+pyfs-gui = pyfsmanager.gui:main
