@@ -362,30 +362,82 @@ def set_windows_permissions(path: str, perms: FilePermissions) -> None:
 
 
 # --- icacls fallback implementations (best-effort when pywin32 unavailable) ---
+
+def _get_current_username() -> str:
+    """
+    Returns the current username robustly, without relying on os.getlogin()
+    which can fail when there is no controlling TTY (e.g. Windows services, CI).
+    """
+    name = os.environ.get('USERNAME') or os.environ.get('USER')
+    if name:
+        return name
+    try:
+        return os.getlogin()
+    except OSError:
+        return 'UNKNOWN'
+
+
 def _rwx_to_icacls_mask(rwx: str) -> str:
-    # Map rwx to icacls style: R, W, M (modify) or RX
+    """Map a POSIX rwx string to an icacls permission flag string."""
     flags = []
     if 'r' in rwx:
         flags.append('R')
     if 'w' in rwx:
-        flags.append('M')
+        flags.append('M')  # 'M' (Modify) approximates POSIX write
     if 'x' in rwx:
         flags.append('X')
-    # icacls uses generic flags; 'M' (modify) approximates write
     return ''.join(flags) or 'R'
 
+
+def _parse_icacls_flags(line: str) -> str:
+    """
+    Parse a single icacls output line and return a POSIX rwx string.
+    Handles flags: (F)=full, (M)=modify, (RX)=read+execute, (R)=read,
+                   (W)=write, (X)=execute and combinations like (R,W).
+    """
+    r, w, x = False, False, False
+
+    # Collect all flag groups between parentheses, e.g. (F), (RX), (R,W)
+    import re
+    for group in re.findall(r'\(([^)]+)\)', line):
+        # Skip inheritance markers like I, OI, CI, IO
+        tokens = {t.strip() for t in group.split(',')}
+        if tokens & {'I', 'OI', 'CI', 'IO'}:
+            # Could be inheritance prefix — check remaining tokens
+            tokens -= {'I', 'OI', 'CI', 'IO'}
+        if not tokens:
+            continue
+        for token in tokens:
+            token = token.strip().upper()
+            if token in ('F',):           # Full control
+                r = w = x = True
+            elif token in ('M',):         # Modify
+                r = w = x = True
+            elif token == 'RX':           # Read & Execute
+                r = x = True
+            elif token == 'R':            # Read
+                r = True
+            elif token == 'W':            # Write
+                w = True
+            elif token == 'X':            # Execute
+                x = True
+
+    return ('r' if r else '-') + ('w' if w else '-') + ('x' if x else '-')
+
 def set_windows_permissions_icacls(path: str, perms: FilePermissions) -> None:
-    # Apply ACLs using icacls for current user and Everyone
-    user = os.getlogin()
-    # Build icacls strings
+    """
+    Apply ACLs using icacls for the current user and Everyone.
+    Uses robust username detection that works outside interactive TTY sessions.
+    """
+    user = _get_current_username()
     user_mask = _rwx_to_icacls_mask(perms.user)
     everyone_mask = _rwx_to_icacls_mask(perms.other)
 
-    cmds = []
-    # Grant permissions to user
-    cmds.append(["icacls", path, "/grant", f"{user}:({user_mask})"]) 
-    # Replace Everyone permissions
-    cmds.append(["icacls", path, "/grant", f"Everyone:({everyone_mask})"]) 
+    cmds = [
+        # /grant:r replaces existing grants for the principal (idempotent)
+        ["icacls", path, "/grant:r", f"{user}:({user_mask})"],
+        ["icacls", path, "/grant:r", f"Everyone:({everyone_mask})"],
+    ]
 
     for cmd in cmds:
         res = subprocess.run(cmd, capture_output=True, text=True)
@@ -393,35 +445,47 @@ def set_windows_permissions_icacls(path: str, perms: FilePermissions) -> None:
             raise OSError(f"icacls failed: {res.stderr.strip() or res.stdout.strip()}")
 
 def get_windows_permissions_icacls(path: str) -> FilePermissions:
-    # Query icacls and do a best-effort parse for current user and Everyone
+    """
+    Query icacls and parse permissions for the current user, BUILTIN\\Users,
+    and Everyone. Properly handles flag combinations like (F), (M), (RX),
+    (R), (W), (X) and comma-separated groups like (R,W).
+    """
     try:
         proc = subprocess.run(["icacls", path], capture_output=True, text=True)
         out = proc.stdout + proc.stderr
     except FileNotFoundError:
         raise
 
-    # Default to readable/writable for user if parsing fails
-    user_rwx = 'rwx'
+    current_user = _get_current_username().lower()
+
+    # Defaults: fall back to os.access() probing if no matching line found
+    user_rwx: str | None = None
     group_rwx = 'r-x'
     everyone_rwx = 'r--'
 
-    # Try to find Everyone: or BUILTIN\Users: entries
     for line in out.splitlines():
-        if ':' not in line:
+        # icacls lines look like:
+        #   C:\path\file  DOMAIN\user:(flags)
+        #   (continuation lines start with spaces)
+        stripped = line.strip()
+        if not stripped or '(' not in stripped:
             continue
-        # Example: "C:\path\to\file NT AUTHORITY\\SYSTEM:(I)(F)"
-        if 'Everyone' in line or 'BUILTIN\\Users' in line:
-            # crude parse for (R) (M) (F) (RX)
-            if '(F)' in line or '(M)' in line:
-                everyone_rwx = 'rw-'
-            elif '(R)' in line:
-                everyone_rwx = 'r--'
-            elif '(RX)' in line:
-                everyone_rwx = 'r-x'
-    # For user, make it at least read/write if file is writable
-    if os.access(path, os.R_OK):
-        user_rwx = 'r--'
-    if os.access(path, os.W_OK):
-        user_rwx = 'rw-'
+
+        lower = stripped.lower()
+
+        # Match current user (may appear as DOMAIN\user or just user)
+        if current_user in lower and user_rwx is None:
+            user_rwx = _parse_icacls_flags(stripped)
+
+        # Match Everyone or BUILTIN\Users as the "other" group
+        if 'everyone' in lower or 'builtin\\users' in lower:
+            everyone_rwx = _parse_icacls_flags(stripped)
+
+    # If the user was not found in icacls output, fall back to os.access() probing
+    if user_rwx is None:
+        r = 'r' if os.access(path, os.R_OK) else '-'
+        w = 'w' if os.access(path, os.W_OK) else '-'
+        x = 'x' if os.access(path, os.X_OK) else '-'
+        user_rwx = r + w + x
 
     return FilePermissions(user_rwx, group_rwx, everyone_rwx)

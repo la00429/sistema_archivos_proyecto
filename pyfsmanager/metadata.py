@@ -37,6 +37,7 @@ class FileMetadata:
         self.atime = st.st_atime
         self.mtime = st.st_mtime
         self.ctime = st.st_ctime # Linux: change, Windows: creation
+        self.nlink = st.st_nlink  # Number of hard links to this inode
         
         # Determine file type
         if is_junction(path):
@@ -89,6 +90,7 @@ class FileMetadata:
             'name': self.name,
             'size': self.size,
             'type': self.type,
+            'nlink': self.nlink,
             'permissions': self.permissions.to_symbolic(),
             'permissions_octal': oct(self.permissions.to_octal()),
             'atime': datetime.datetime.fromtimestamp(self.atime).isoformat(),
@@ -100,7 +102,7 @@ class FileMetadata:
 
     def __repr__(self) -> str:
         return (f"FileMetadata(name='{self.name}', type='{self.type}', size={self.size}, "
-                f"perms='{self.permissions.to_symbolic()}', mtime={self.mtime})")
+                f"nlink={self.nlink}, perms='{self.permissions.to_symbolic()}', mtime={self.mtime})")
 
 
 def get_metadata(path: str) -> FileMetadata:
@@ -134,7 +136,10 @@ def set_file_times(path: str, atime: float = None, mtime: float = None, birthtim
                 win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE,
                 None,
                 win32con.OPEN_EXISTING,
-                win32con.FILE_ATTRIBUTE_NORMAL if not os.path.isdir(path) else FILE_FLAG_BACKUP_SEMANTICS,
+                # Directories require FILE_FLAG_BACKUP_SEMANTICS to be opened;
+                # regular files use FILE_ATTRIBUTE_NORMAL. The flags must be
+                # set as dwFlagsAndAttributes (4th positional arg to CreateFile).
+                FILE_FLAG_BACKUP_SEMANTICS if os.path.isdir(path) else win32con.FILE_ATTRIBUTE_NORMAL,
                 None
             )
             try:

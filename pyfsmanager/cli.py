@@ -142,8 +142,8 @@ Uso: ls [ruta]"""
             item_metas.sort(key=sort_key)
 
             # Print header
-            print(f"{'TIPO':<10} {'PERMISOS':<10} {'TAMAÑO':<10} {'MODIFICADO':<20} {'NOMBRE'}")
-            print("-" * 80)
+            print(f"{'TIPO':<10} {'PERMISOS':<10} {'LINKS':<6} {'TAMAÑO':<10} {'MODIFICADO':<20} {'NOMBRE'}")
+            print("-" * 85)
             
             for meta in item_metas:
                 type_str = meta.type.upper()
@@ -151,19 +151,24 @@ Uso: ls [ruta]"""
                 size_str = format_size(meta.size) if meta.type == 'regular' else '-'
                 time_str = format_time(meta.mtime)
                 
-                # Apply colors based on type
+                # Apply colors based on type, truncate long names to keep columns aligned
+                MAX_NAME = 40
                 if meta.type == 'directory':
-                    name_display = Fore.BLUE + meta.name + Style.RESET_ALL
+                    display_name = Fore.BLUE + meta.name[:MAX_NAME] + Style.RESET_ALL
                 elif meta.type == 'junction':
-                    name_display = Fore.CYAN + meta.name + f" -> {meta.link_target}" + Style.RESET_ALL
+                    display_name = Fore.CYAN + meta.name[:MAX_NAME] + Style.RESET_ALL
                 elif meta.type == 'symlink':
-                    name_display = Fore.CYAN + meta.name + f" -> {meta.link_target}" + Style.RESET_ALL
+                    display_name = Fore.CYAN + meta.name[:MAX_NAME] + Style.RESET_ALL
                 elif 'x' in meta.permissions.user and meta.type == 'regular':
-                    name_display = Fore.GREEN + meta.name + Style.RESET_ALL
+                    display_name = Fore.GREEN + meta.name[:MAX_NAME] + Style.RESET_ALL
                 else:
-                    name_display = meta.name
+                    display_name = meta.name[:MAX_NAME]
 
-                print(f"{type_str:<10} {perms_str:<10} {size_str:<10} {time_str:<20} {name_display}")
+                print(f"{type_str:<10} {perms_str:<10} {meta.nlink:<6} {size_str:<10} {time_str:<20} {display_name}")
+
+                # Print link target on a second line so it never misaligns columns
+                if meta.link_target and meta.type in ('symlink', 'junction'):
+                    print(f"{'':10} {'':10} {'':6} {'':10} {'':20} {Fore.CYAN}  └→ {meta.link_target}{Style.RESET_ALL}")
                 
         except ValueError:
             pass
@@ -182,6 +187,7 @@ Uso: stat <ruta>"""
             print(f"  Tipo de archivo: {meta.type.upper()}")
             print(f"  Tamaño:          {meta.size} bytes ({format_size(meta.size)})")
             print(f"  Permisos:        {meta.permissions.to_symbolic()} ({oct(meta.permissions.to_octal())})")
+            print(f"  Hard links:      {meta.nlink}")
             if meta.link_target:
                 print(f"  Destino enlace:  {meta.link_target}")
             print(f"  Acceso (atime):  {format_time(meta.atime)}")

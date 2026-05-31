@@ -2,7 +2,11 @@ import os
 import sys
 import tempfile
 import pytest
-from pyfsmanager.permissions import FilePermissions, parse_permissions, parse_chmod_symbolic, get_file_permissions, set_file_permissions
+from pyfsmanager.permissions import (
+    FilePermissions, parse_permissions, parse_chmod_symbolic,
+    get_file_permissions, set_file_permissions,
+    _get_current_username, _parse_icacls_flags,
+)
 
 def test_permissions_normalization():
     p = FilePermissions("r-x", "w-x", "rw-")
@@ -68,5 +72,49 @@ def test_get_and_set_file_permissions():
             # On Windows, we map ACLs. Let's make sure it's readable and writable
             assert 'r' in perms.user
             assert 'w' in perms.user
+    finally:
+        os.unlink(path)
+
+# --- Regression tests for fixed bugs ---
+
+def test_get_current_username_never_raises():
+    """Bug 3 regression: _get_current_username() must never raise, even without TTY."""
+    name = _get_current_username()
+    assert isinstance(name, str)
+    assert len(name) > 0
+
+def test_parse_icacls_flags_full():
+    """Bug 2 regression: (F) flag must map to rwx."""
+    assert _parse_icacls_flags("DOMAIN\\user:(F)") == "rwx"
+
+def test_parse_icacls_flags_modify():
+    """Bug 2 regression: (M) flag must map to rwx (Modify includes read, write, execute)."""
+    assert _parse_icacls_flags("user:(M)") == "rwx"
+
+def test_parse_icacls_flags_rx():
+    """Bug 2 regression: (RX) flag must map to r-x."""
+    assert _parse_icacls_flags("user:(RX)") == "r-x"
+
+def test_parse_icacls_flags_read_only():
+    """Bug 2 regression: (R) flag must map to r--."""
+    assert _parse_icacls_flags("user:(R)") == "r--"
+
+def test_parse_icacls_flags_with_inheritance():
+    """Bug 2 regression: inheritance markers (I)(OI)(CI) must be ignored."""
+    assert _parse_icacls_flags("BUILTIN\\Users:(I)(RX)") == "r-x"
+    assert _parse_icacls_flags("Everyone:(OI)(CI)(F)") == "rwx"
+
+@pytest.mark.skipif(sys.platform != 'win32', reason="Windows-only test")
+def test_get_windows_permissions_icacls_returns_valid():
+    """Bug 2 regression: icacls fallback must return a valid FilePermissions object."""
+    from pyfsmanager.permissions import get_windows_permissions_icacls
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        path = f.name
+    try:
+        perms = get_windows_permissions_icacls(path)
+        assert isinstance(perms, FilePermissions)
+        for rwx in (perms.user, perms.group, perms.other):
+            assert len(rwx) == 3
+            assert all(c in 'rwx-' for c in rwx)
     finally:
         os.unlink(path)

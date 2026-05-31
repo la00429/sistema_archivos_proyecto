@@ -3,6 +3,7 @@ import sys
 import tempfile
 import pytest
 from pyfsmanager.manager import FSManager
+from pyfsmanager.metadata import get_metadata
 
 def test_read_write_text():
     with tempfile.NamedTemporaryFile(delete=False) as f:
@@ -60,9 +61,8 @@ def test_touch_mkdir_delete():
         assert not os.path.exists(test_dir)
     finally:
         if os.path.exists(tmp_dir):
-            shutil_path = tmp_dir
             import shutil
-            shutil.rmtree(shutil_path)
+            shutil.rmtree(tmp_dir)
 
 def test_copy_move():
     tmp_dir = tempfile.mkdtemp()
@@ -86,3 +86,71 @@ def test_copy_move():
     finally:
         import shutil
         shutil.rmtree(tmp_dir)
+
+# --- Regression tests for fixed bugs ---
+
+def test_utf8_bom_no_duplication():
+    """Bug 9 regression: overwriting a UTF-8 BOM file must not duplicate the BOM."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as f:
+        path = f.name
+    try:
+        # Write a file with UTF-8 BOM manually
+        with open(path, 'wb') as f:
+            f.write(b'\xef\xbb\xbf')  # UTF-8 BOM
+            f.write('Hola mundo'.encode('utf-8'))
+
+        # Overwrite using FSManager (detects utf-8-sig and must NOT duplicate BOM)
+        FSManager.write_file(path, "Hola mundo editado")
+
+        with open(path, 'rb') as f:
+            raw = f.read()
+
+        bom = b'\xef\xbb\xbf'
+        # The BOM must appear AT MOST once at the start
+        assert raw.count(bom) <= 1, f"BOM was duplicated! Raw bytes start: {raw[:12]!r}"
+    finally:
+        os.unlink(path)
+
+
+def test_metadata_nlink():
+    """Mejora 1: FileMetadata must expose nlink (hard link count)."""
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        path = f.name
+    try:
+        meta = get_metadata(path)
+        assert hasattr(meta, 'nlink'), "FileMetadata must have nlink attribute"
+        assert isinstance(meta.nlink, int)
+        assert meta.nlink >= 1
+        # nlink must also appear in to_dict()
+        d = meta.to_dict()
+        assert 'nlink' in d
+        assert d['nlink'] == meta.nlink
+    finally:
+        os.unlink(path)
+
+
+def test_delete_nonexistent_raises():
+    """Edge case: deleting a non-existent path must raise FileNotFoundError."""
+    with pytest.raises(FileNotFoundError):
+        FSManager.delete("/this/path/does/not/exist/at/all_xyz_999")
+
+
+def test_copy_directory():
+    """Edge case: copying a directory must copy its contents recursively."""
+    tmp = tempfile.mkdtemp()
+    try:
+        src_dir = os.path.join(tmp, "src_dir")
+        os.makedirs(src_dir)
+        src_file = os.path.join(src_dir, "file.txt")
+        FSManager.write_file(src_file, "contenido de prueba")
+
+        dst_dir = os.path.join(tmp, "dst_dir")
+        FSManager.copy(src_dir, dst_dir)
+
+        assert os.path.isdir(dst_dir)
+        copied_file = os.path.join(dst_dir, "file.txt")
+        assert os.path.exists(copied_file)
+        assert FSManager.read_file(copied_file) == "contenido de prueba"
+    finally:
+        import shutil
+        shutil.rmtree(tmp)

@@ -80,9 +80,13 @@ class FSManager:
     @staticmethod
     def write_file(path: str, content: Union[str, bytes], encoding: Optional[str] = None) -> None:
         """
-        Writes content to a file. 
+        Writes content to a file.
         If content is a string, writes in text mode (using detected or specified encoding).
         If content is bytes, writes in binary mode.
+
+        Note: when the detected encoding is 'utf-8-sig' (UTF-8 with BOM) and the
+        file already exists, we write with plain 'utf-8' to avoid re-inserting the
+        BOM and duplicating it. The BOM is only needed on the first byte of a new file.
         """
         if isinstance(content, bytes):
             with open(path, 'wb') as f:
@@ -93,7 +97,10 @@ class FSManager:
                     encoding = detect_encoding(path)
                 else:
                     encoding = 'utf-8'
-            with open(path, 'w', encoding=encoding, errors='replace') as f:
+            # Bug 9 fix: utf-8-sig re-inserts the BOM on every write, duplicating it
+            # when overwriting an existing BOM file. Use plain utf-8 for overwrite.
+            write_encoding = 'utf-8' if (encoding == 'utf-8-sig' and os.path.exists(path)) else encoding
+            with open(path, 'w', encoding=write_encoding, errors='replace') as f:
                 f.write(content)
 
     @staticmethod

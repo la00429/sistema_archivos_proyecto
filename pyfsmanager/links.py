@@ -75,7 +75,7 @@ def is_junction(path: str) -> bool:
     if hasattr(os.path, 'isjunction'):
         return os.path.isjunction(path)
         
-    # Fallback for Python < 3.8
+    # Fallback for Python < 3.12 (os.path.isjunction was added in 3.12)
     try:
         import win32file
         import win32con

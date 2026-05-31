@@ -21,7 +21,7 @@ Gestor de sistemas de archivos en Python con detección automática de plataform
 
 Notas por plataforma:
 
-- Windows: Windows 10/11 o Server 2016+. Para crear symlinks sin privilegios puedes habilitar el modo desarrollador (Settings → For developers) o ejecutar el shell con permisos elevados. Las junctions (mklink /J) se usan como alternativa donde aplique.
+- Windows: Windows 10/11 o Server 2016+. Para crear symlinks sin privilegios puedes habilitar el modo desarrollador (Settings → For developers) o ejecutar el shell con permisos elevados. Las junctions (mklink /J) se usan como alternativa donde aplique. La detección nativa de junctions (`os.path.isjunction`) requiere Python 3.12+; en versiones anteriores se usa `pywin32` como fallback.
 - Linux/macOS: cualquier distribución moderna con Python 3.9+ y soporte estándar de POSIX.
 
 ## Instalación
@@ -129,6 +129,16 @@ Las pruebas cubren:
 - Lectura y escritura de marcas de tiempo detalladas.
 - Creación, lectura y detección de enlaces simbólicos, duros y junctions.
 - Operaciones CRUD (creación, lectura, copia, movimiento, eliminación) e inferencia de codificación y tipo.
+
+---
+
+## Limitaciones conocidas en Windows
+
+- **Symlinks**: La creación de symlinks requiere el modo desarrollador activado o ejecutar con privilegios elevados (Administrador). Como alternativa se pueden crear **junctions** (`link junction`) sin privilegios especiales.
+- **Permisos (ACLs)**: El modelo de permisos de Windows (NTFS ACL) es más rico que el modelo POSIX (rwx). La abstracción del proyecto mapea los conceptos básicos de la forma más fiel posible, pero no expone todos los matices de las ACLs de Windows.
+- **`ctime`**: En Windows, `ctime` es la **fecha de creación** del archivo. En Linux/macOS es la **fecha del último cambio de metadatos**. Esta diferencia se refleja en la etiqueta "Cambio" del CLI/GUI en Windows.
+- **`birthtime` en Linux**: La fecha de creación real (`birthtime`) no está disponible en la mayoría de sistemas de archivos de Linux; el campo aparece como `N/D`.
+- **`st_ino`**: Los inodes en Windows (NTFS) existen internamente pero Python no siempre los expone de forma fiable; por eso la columna `LINKS` en `ls` muestra el conteo de hard links (`nlink`) pero no el número de inode.
 
 ---
 
