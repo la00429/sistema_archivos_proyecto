@@ -69,7 +69,7 @@ class FSManager:
             raise FileNotFoundError(f"File not found: {path}")
             
         ftype = detect_file_type(path)
-        if ftype == 'binary':
+        if ftype in ('binary', 'pdf', 'document'):
             with open(path, 'rb') as f:
                 return f.read()
         else:

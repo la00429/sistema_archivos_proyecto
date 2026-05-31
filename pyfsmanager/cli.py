@@ -315,7 +315,18 @@ Uso: cat <ruta>"""
             content = FSManager.read_file(path)
             ftype = detect_file_type(path)
             
-            if ftype == 'binary':
+            if ftype == 'pdf':
+                try:
+                    from pypdf import PdfReader
+                    reader = PdfReader(path)
+                    print(Fore.YELLOW + f"--- PDF ({len(reader.pages)} páginas) ---")
+                    for page in reader.pages[:3]:
+                        page_text = page.extract_text() or "(sin texto extraíble)"
+                        print(page_text)
+                        print("\n--- Página ---\n")
+                except Exception as e:
+                    print(Fore.RED + f"No se pudo leer el PDF: {e}")
+            elif ftype == 'binary':
                 print(Fore.YELLOW + f"--- Contenido Binario (Hexdump) - {len(content)} bytes ---")
                 print(hex_dump(content))
             else:

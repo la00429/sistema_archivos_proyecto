@@ -2,7 +2,7 @@ import os
 
 def detect_file_type(path: str) -> str:
     """
-    Determines if a file is 'text', 'binary', or 'unknown' (e.g. if it doesn't exist or is a directory).
+    Determines if a file is 'text', 'binary', 'pdf', 'document', or 'unknown' (e.g. if it doesn't exist or is a directory).
     """
     if not os.path.exists(path) or os.path.isdir(path):
         return 'unknown'
@@ -12,6 +12,13 @@ def detect_file_type(path: str) -> str:
             chunk = f.read(4096)
     except Exception:
         return 'unknown'
+
+    lower_path = path.lower()
+    if lower_path.endswith('.pdf') or chunk.startswith(b'%PDF-'):
+        return 'pdf'
+
+    if lower_path.endswith(('.doc', '.docx', '.rtf', '.odt', '.xls', '.xlsx', '.ppt', '.pptx')):
+        return 'document'
         
     # An empty file is considered text by default
     if not chunk:

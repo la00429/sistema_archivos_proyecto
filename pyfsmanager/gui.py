@@ -3,7 +3,6 @@ import sys
 import time
 import datetime
 import tkinter as tk
-import sv_ttk
 from tkinter import ttk, messagebox, filedialog
 from typing import Optional
 
@@ -12,17 +11,24 @@ from .metadata import FileMetadata
 from .permissions import FilePermissions
 
 # Theme colors (centralized for easier tweaks)
-THEME_BG = '#1e1e1e'
-PANEL_BG = '#252526'
-PANEL_ALT = '#2d2d2d'
-SURFACE = '#2d2d2d'
-ACCENT = '#007acc'
+THEME_BG = '#0f1218'
+PANEL_BG = '#151a22'
+PANEL_ALT = '#1b2230'
+SURFACE = '#1f2633'
+ACCENT = '#5b8cff'
+ACCENT_HOVER = '#7aa2ff'
 ON_ACCENT = '#ffffff'
-MUTED = '#888888'
-HEADER_BG = '#3c3c3c'
-STATUS_BG = '#111111'
-STATUS_FG = '#cccccc'
-DISABLED_FG = '#555555'
+MUTED = '#8b97a7'
+TEXT_PRIMARY = '#ecf2ff'
+TEXT_SECONDARY = '#c4cfde'
+HEADER_BG = '#171d27'
+STATUS_BG = '#0c1016'
+STATUS_FG = '#d5deea'
+DISABLED_FG = '#5b6676'
+BORDER_BG = '#2b3443'
+INPUT_BG = '#111722'
+CARD_BG = '#171e29'
+CARD_ELEVATED = '#1c2431'
 
 # Try to enable high DPI awareness on Windows to prevent blurry GUI
 if sys.platform == 'win32':
@@ -42,17 +48,197 @@ def format_size(bytes_size: int) -> str:
 def format_time(ts: float) -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
 
+
+def apply_modern_palette(widget):
+    widget.configure(bg=THEME_BG)
+    style = ttk.Style(widget)
+    try:
+        style.theme_use('clam')
+    except tk.TclError:
+        pass
+
+    style.configure('.', background=THEME_BG, foreground=TEXT_PRIMARY)
+    style.configure('TFrame', background=THEME_BG)
+    style.configure('Surface.TFrame', background=PANEL_BG)
+    style.configure('Card.TFrame', background=CARD_BG)
+    style.configure('Header.TFrame', background=HEADER_BG)
+    style.configure('TLabel', background=THEME_BG, foreground=TEXT_PRIMARY)
+    style.configure('Muted.TLabel', background=THEME_BG, foreground=MUTED)
+    style.configure('Title.TLabel', background=THEME_BG, foreground=TEXT_PRIMARY, font=('Segoe UI Semibold', 16))
+    style.configure('Subtitle.TLabel', background=THEME_BG, foreground=TEXT_SECONDARY, font=('Segoe UI', 9))
+    style.configure('Section.TLabel', background=CARD_BG, foreground=ACCENT, font=('Segoe UI Semibold', 10))
+    style.configure('CardTitle.TLabel', background=CARD_BG, foreground=TEXT_PRIMARY, font=('Segoe UI Semibold', 14))
+    style.configure('CardSubtitle.TLabel', background=CARD_BG, foreground=TEXT_SECONDARY, font=('Segoe UI', 9))
+    style.configure('CardValue.TLabel', background=CARD_BG, foreground=TEXT_PRIMARY, font=('Segoe UI', 10))
+    style.configure('TButton', padding=(12, 7), borderwidth=0, focusthickness=1, focuscolor=ACCENT)
+    style.map(
+        'TButton',
+        foreground=[('disabled', DISABLED_FG), ('pressed', ON_ACCENT), ('active', ON_ACCENT)],
+        background=[('disabled', BORDER_BG), ('pressed', ACCENT_HOVER), ('active', ACCENT_HOVER)],
+        relief=[('pressed', 'flat'), ('!pressed', 'flat')],
+    )
+    style.configure('Accent.TButton', background=ACCENT, foreground=ON_ACCENT)
+    style.map('Accent.TButton', background=[('active', ACCENT_HOVER), ('pressed', ACCENT_HOVER)])
+    style.configure(
+        'TEntry',
+        fieldbackground=INPUT_BG,
+        background=INPUT_BG,
+        foreground=TEXT_PRIMARY,
+        bordercolor=BORDER_BG,
+        lightcolor=BORDER_BG,
+        darkcolor=BORDER_BG,
+        insertcolor=TEXT_PRIMARY,
+        padding=8,
+        relief='flat',
+    )
+    style.configure('Treeview', background=CARD_BG, fieldbackground=CARD_BG, foreground=TEXT_PRIMARY, rowheight=30, borderwidth=0)
+    style.configure('Treeview.Heading', background=PANEL_BG, foreground=TEXT_PRIMARY, relief='flat', padding=(10, 8))
+    style.map('Treeview', background=[('selected', ACCENT)], foreground=[('selected', ON_ACCENT)])
+    style.map('Treeview.Heading', background=[('active', PANEL_ALT)])
+    style.configure('TScrollbar', background=PANEL_BG, troughcolor=THEME_BG, arrowcolor=TEXT_PRIMARY, bordercolor=THEME_BG)
+
+
+def style_modern_entry(entry, *, readonly: bool = False):
+    entry.configure(
+        bg=INPUT_BG,
+        fg=TEXT_PRIMARY,
+        insertbackground=TEXT_PRIMARY,
+        relief='flat',
+        bd=0,
+        highlightthickness=1,
+        highlightbackground=BORDER_BG,
+        highlightcolor=ACCENT,
+        selectbackground=ACCENT,
+        selectforeground=ON_ACCENT,
+        disabledbackground=INPUT_BG,
+        disabledforeground=MUTED,
+    )
+    if readonly:
+        entry.configure(readonlybackground=INPUT_BG, state='readonly')
+
+
+def style_modern_text(widget, *, readonly: bool = False, wrap=tk.WORD):
+    widget.configure(
+        bg=INPUT_BG,
+        fg=TEXT_PRIMARY,
+        insertbackground=TEXT_PRIMARY,
+        selectbackground=ACCENT,
+        selectforeground=ON_ACCENT,
+        relief='flat',
+        bd=0,
+        highlightthickness=1,
+        highlightbackground=BORDER_BG,
+        highlightcolor=ACCENT,
+        padx=12,
+        pady=12,
+        wrap=wrap,
+    )
+    if readonly:
+        widget.configure(state=tk.DISABLED)
+
+
+def bind_windows_text_shortcuts(widget, *, allow_cut: bool = True, allow_paste: bool = True, allow_undo: bool = True):
+    def select_all(event=None):
+        try:
+            widget.tag_add(tk.SEL, '1.0', tk.END)
+            widget.mark_set(tk.INSERT, tk.END)
+            widget.see(tk.INSERT)
+        except tk.TclError:
+            pass
+        return 'break'
+
+    def copy_selection(event=None):
+        try:
+            text = widget.get(tk.SEL_FIRST, tk.SEL_LAST)
+            widget.clipboard_clear()
+            widget.clipboard_append(text)
+        except tk.TclError:
+            pass
+        return 'break'
+
+    def cut_selection(event=None):
+        if not allow_cut:
+            return 'break'
+        try:
+            text = widget.get(tk.SEL_FIRST, tk.SEL_LAST)
+            widget.clipboard_clear()
+            widget.clipboard_append(text)
+            widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
+        except tk.TclError:
+            pass
+        return 'break'
+
+    def paste_clipboard(event=None):
+        if not allow_paste:
+            return 'break'
+        try:
+            widget.insert(tk.INSERT, widget.clipboard_get())
+        except tk.TclError:
+            pass
+        return 'break'
+
+    def undo_action(event=None):
+        if not allow_undo:
+            return 'break'
+        try:
+            widget.edit_undo()
+        except tk.TclError:
+            pass
+        return 'break'
+
+    def redo_action(event=None):
+        if not allow_undo:
+            return 'break'
+        try:
+            widget.edit_redo()
+        except tk.TclError:
+            pass
+        return 'break'
+
+    widget.bind('<Control-a>', select_all)
+    widget.bind('<Control-A>', select_all)
+    widget.bind('<Control-c>', copy_selection)
+    widget.bind('<Control-C>', copy_selection)
+    widget.bind('<Control-x>', cut_selection)
+    widget.bind('<Control-X>', cut_selection)
+    widget.bind('<Control-v>', paste_clipboard)
+    widget.bind('<Control-V>', paste_clipboard)
+    widget.bind('<Control-z>', undo_action)
+    widget.bind('<Control-Z>', undo_action)
+    widget.bind('<Control-y>', redo_action)
+    widget.bind('<Control-Y>', redo_action)
+    widget.bind('<Control-Shift-Z>', redo_action)
+    return widget
+
+
+def style_modern_menu(menu):
+    menu.configure(
+        bg=PANEL_BG,
+        fg=TEXT_PRIMARY,
+        activebackground=ACCENT,
+        activeforeground=ON_ACCENT,
+        bd=0,
+        relief='flat',
+        tearoff=0,
+    )
+
 class FileEditorWindow(tk.Toplevel):
     """
     Built-in Text Editor / Hex Viewer dialog.
     Automatically detects file type (text vs binary) and presents an editor or viewer.
     """
-    def __init__(self, parent, filepath: str):
+    def __init__(self, parent, filepath: str, view_mode: str = 'auto'):
         super().__init__(parent)
+        apply_modern_palette(self)
+        self.transient(parent)
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.filepath = os.path.abspath(filepath)
         self.filename = os.path.basename(filepath)
+        self.view_mode = view_mode
         self.title(f"Editor - {self.filename}")
         self.geometry("800x600")
+        self.minsize(720, 520)
         
         
         # Read contents
@@ -71,56 +257,98 @@ class FileEditorWindow(tk.Toplevel):
         self.setup_ui()
 
     def setup_ui(self):
-        # Header Info
-        header_frame = tttk.Frame(self.root_frame, height=40)
-        header_frame.pack(fill=tk.X)
-        
-        type_lbl = tttk.Label(
-            header_frame, 
-            text=f"Archivo: {self.filename} | Tipo: {self.file_type.upper} | Codificación: {self.encoding.upper}",
-            font=('Segoe UI', 10, 'bold')
+        main_frame = ttk.Frame(self, padding=16, style='TFrame')
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(1, weight=1)
+
+        header_frame = ttk.Frame(main_frame, style='Card.TFrame', padding=(16, 14))
+        header_frame.grid(row=0, column=0, sticky='ew', pady=(0, 12))
+
+        type_lbl = ttk.Label(header_frame, text=f"Archivo: {self.filename}", style='CardTitle.TLabel')
+        type_lbl.pack(anchor='w')
+
+        meta_lbl = ttk.Label(
+            header_frame,
+            text=f"Tipo: {self.file_type.upper()} · Codificación: {self.encoding.upper()}",
+            style='CardSubtitle.TLabel',
         )
-        type_lbl.pack(side=tk.LEFT, padx=10, pady=10)
+        meta_lbl.pack(anchor='w', pady=(4, 0))
+
+        content_frame = ttk.Frame(main_frame, style='Card.TFrame')
+        content_frame.grid(row=1, column=0, sticky='nsew')
+        content_frame.columnconfigure(0, weight=1)
+        content_frame.rowconfigure(0, weight=1)
+
+        display_mode = self.file_type if self.view_mode == 'auto' else self.view_mode
 
         # Content Text Area
         self.txt_area = tk.Text(
-            self, 
-            insertbackground=ON_ACCENT,
+            content_frame,
             font=('Consolas', 11),
-            wrap=tk.WORD if self.file_type == 'text' else tk.NONE,
-            padx=10,
-            pady=10,
-            bd=0
+            wrap=tk.WORD if display_mode in ('text', 'pdf') else tk.NONE,
+            padx=12,
+            pady=12,
+            bd=0,
+            relief='flat',
+            undo=True,
+            autoseparators=True,
+            maxundo=500,
+            exportselection=False,
         )
-        
+        style_modern_text(self.txt_area, wrap=tk.WORD if display_mode in ('text', 'pdf') else tk.NONE)
+        bind_windows_text_shortcuts(self.txt_area, allow_cut=(display_mode == 'text'), allow_paste=(display_mode == 'text'), allow_undo=(display_mode == 'text'))
+
         # Scrollbar
-        scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.txt_area.yview)
+        scrollbar = ttk.Scrollbar(content_frame, orient=tk.VERTICAL, command=self.txt_area.yview)
         self.txt_area.configure(yscrollcommand=scrollbar.set)
-        
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.txt_area.pack(fill=tk.BOTH, expand=True)
+
+        self.txt_area.grid(row=0, column=0, sticky='nsew')
+        scrollbar.grid(row=0, column=1, sticky='ns')
 
         # Load content
-        if self.file_type == 'binary':
+        if display_mode == 'pdf':
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(self.filepath)
+                pages = []
+                for page in reader.pages[:3]:
+                    pages.append(page.extract_text() or "(sin texto extraíble en esta página)")
+                self.txt_area.insert(tk.END, f"Documento PDF\nPáginas: {len(reader.pages)}\n\n" + "\n\n--- Página ---\n\n".join(pages))
+            except Exception as e:
+                self.txt_area.insert(tk.END, f"No se pudo renderizar el PDF en esta vista.\n\n{e}")
+            self.txt_area.configure(state=tk.DISABLED)
+
+            btn_frame = ttk.Frame(main_frame, style='TFrame')
+            btn_frame.grid(row=2, column=0, sticky='ew', pady=(12, 0))
+            close_btn = ttk.Button(btn_frame, text="Cerrar", command=self.destroy, style='Accent.TButton')
+            close_btn.pack(side=tk.RIGHT, padx=10, pady=10)
+        elif display_mode == 'binary':
             # View-only Hexdump
             from .cli import hex_dump
             self.txt_area.insert(tk.END, hex_dump(self.content))
             self.txt_area.configure(state=tk.DISABLED)
             
             # Bottom action bar (close only)
-            btn_frame = tttk.Frame(self)
-            btn_frame.pack(fill=tk.X)
-            close_btn = ttk.Button(btn_frame, text="Cerrar", command=self.destroy)
+            btn_frame = ttk.Frame(main_frame, style='TFrame')
+            btn_frame.grid(row=2, column=0, sticky='ew', pady=(12, 0))
+            close_btn = ttk.Button(btn_frame, text="Cerrar", command=self.destroy, style='Accent.TButton')
             close_btn.pack(side=tk.RIGHT, padx=10, pady=10)
         else:
             # Edit text mode
-            self.txt_area.insert(tk.END, self.content)
+            if isinstance(self.content, bytes):
+                self.txt_area.insert(tk.END, self.content.decode(self.encoding, errors='replace'))
+            else:
+                self.txt_area.insert(tk.END, self.content)
+            self.txt_area.edit_reset()
+            self.txt_area.focus_set()
+            self.bind('<Control-s>', lambda e: self.save_file())
             
             # Bottom action bar (Save/Cancel)
-            btn_frame = tttk.Frame(self)
-            btn_frame.pack(fill=tk.X)
+            btn_frame = ttk.Frame(main_frame, style='TFrame')
+            btn_frame.grid(row=2, column=0, sticky='ew', pady=(12, 0))
             
-            save_btn = ttk.Button(btn_frame, text="Guardar", command=self.save_file)
+            save_btn = ttk.Button(btn_frame, text="Guardar", command=self.save_file, style='Accent.TButton')
             save_btn.pack(side=tk.RIGHT, padx=10, pady=10)
             
             cancel_btn = ttk.Button(btn_frame, text="Cancelar", command=self.destroy)
@@ -146,6 +374,7 @@ class EditTimesDialog(tk.Toplevel):
     """
     def __init__(self, parent, filepath: str, meta: FileMetadata, on_save_callback):
         super().__init__(parent)
+        apply_modern_palette(self)
         self.filepath = filepath
         self.meta = meta
         self.on_save = on_save_callback
@@ -155,7 +384,7 @@ class EditTimesDialog(tk.Toplevel):
         self.resizable(False, False)
         
         self.transient(parent)
-        self.grab_set
+        self.grab_set()
 
         self.setup_ui()
 
@@ -175,40 +404,50 @@ class EditTimesDialog(tk.Toplevel):
             raise ValueError(f"Formato incorrecto para '{time_str}'. Usar YYYY-MM-DD HH:MM:SS")
 
     def setup_ui(self):
-        # Header Label
-        lbl = tttk.Label(self, text="Editar marcas de tiempo", font=('Segoe UI', 12, 'bold'))
-        lbl.pack(pady=10)
+        main_frame = ttk.Frame(self, padding=16, style='TFrame')
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        grid_frame = tttk.Frame(self)
-        grid_frame.pack(padx=20, fill=tk.X)
+        header = ttk.Frame(main_frame, style='Card.TFrame', padding=(16, 12))
+        header.pack(fill=tk.X, pady=(0, 12))
+
+        lbl = ttk.Label(header, text="Editar marcas de tiempo", style='CardTitle.TLabel')
+        lbl.pack(anchor='w')
+
+        ttk.Label(header, text="Edita atime, mtime y birthtime con un formato consistente.", style='CardSubtitle.TLabel').pack(anchor='w', pady=(4, 0))
+
+        grid_frame = ttk.Frame(main_frame, style='Card.TFrame', padding=16)
+        grid_frame.pack(fill=tk.X)
 
         # Atime
-        tttk.Label(grid_frame, text="Acceso (atime):").grid(row=0, column=0, sticky='w', pady=5)
-        self.entry_atime = ttk.Entry(grid_frame, width=30)
+        ttk.Label(grid_frame, text="Acceso (atime):").grid(row=0, column=0, sticky='w', pady=5)
+        self.entry_atime = tk.Entry(grid_frame, width=30)
         self.entry_atime.insert(0, self.format_ts(self.meta.atime))
         self.entry_atime.grid(row=0, column=1, pady=5, padx=10)
+        style_modern_entry(self.entry_atime)
 
         # Mtime
-        tttk.Label(grid_frame, text="Modificación (mtime):").grid(row=1, column=0, sticky='w', pady=5)
-        self.entry_mtime = ttk.Entry(grid_frame, width=30)
+        ttk.Label(grid_frame, text="Modificación (mtime):").grid(row=1, column=0, sticky='w', pady=5)
+        self.entry_mtime = tk.Entry(grid_frame, width=30)
         self.entry_mtime.insert(0, self.format_ts(self.meta.mtime))
         self.entry_mtime.grid(row=1, column=1, pady=5, padx=10)
+        style_modern_entry(self.entry_mtime)
 
         # Birthtime (Only editable on Windows)
-        tttk.Label(grid_frame, text="Creación (birthtime):").grid(row=2, column=0, sticky='w', pady=5)
-        self.entry_birth = ttk.Entry(grid_frame, width=30)
+        ttk.Label(grid_frame, text="Creación (birthtime):").grid(row=2, column=0, sticky='w', pady=5)
+        self.entry_birth = tk.Entry(grid_frame, width=30)
         if self.meta.birthtime:
             self.entry_birth.insert(0, self.format_ts(self.meta.birthtime))
         else:
             self.entry_birth.insert(0, "No soportado en este S.O.")
             self.entry_birth.configure(state=tk.DISABLED)
         self.entry_birth.grid(row=2, column=1, pady=5, padx=10)
+        style_modern_entry(self.entry_birth)
 
         # Buttons
-        btn_frame = tttk.Frame(self)
-        btn_frame.pack(pady=20, side=tk.BOTTOM, fill=tk.X)
+        btn_frame = ttk.Frame(main_frame, style='TFrame')
+        btn_frame.pack(pady=(14, 0), side=tk.BOTTOM, fill=tk.X)
 
-        save_btn = ttk.Button(btn_frame, text="Guardar", command=self.save)
+        save_btn = ttk.Button(btn_frame, text="Guardar", command=self.save, style='Accent.TButton')
         save_btn.pack(side=tk.RIGHT, padx=20)
 
         cancel_btn = ttk.Button(btn_frame, text="Cancelar", command=self.destroy)
@@ -216,14 +455,14 @@ class EditTimesDialog(tk.Toplevel):
 
     def save(self):
         try:
-            atime = self.parse_time_str(self.entry_atime.get)
-            mtime = self.parse_time_str(self.entry_mtime.get)
+            atime = self.parse_time_str(self.entry_atime.get())
+            mtime = self.parse_time_str(self.entry_mtime.get())
             birthtime = None
-            if self.meta.birthtime and self.entry_birth.get.strip:
-                birthtime = self.parse_time_str(self.entry_birth.get)
+            if self.meta.birthtime and self.entry_birth.get().strip():
+                birthtime = self.parse_time_str(self.entry_birth.get())
 
             FSManager.set_times(self.filepath, atime=atime, mtime=mtime, birthtime=birthtime)
-            self.on_save
+            self.on_save()
             self.destroy()
         except Exception as e:
             messagebox.showerror("Error", f"Error al guardar marcas de tiempo:\n{e}")
@@ -235,6 +474,7 @@ class CreateLinkDialog(tk.Toplevel):
     """
     def __init__(self, parent, target_path: str, on_create_callback):
         super().__init__(parent)
+        apply_modern_palette(self)
         self.target_path = os.path.abspath(target_path)
         self.on_create = on_create_callback
         
@@ -243,28 +483,35 @@ class CreateLinkDialog(tk.Toplevel):
         self.resizable(False, False)
         
         self.transient(parent)
-        self.grab_set
+        self.grab_set()
 
         self.setup_ui()
 
     def setup_ui(self):
-        # Header Label
-        lbl = tttk.Label(self, text="Crear nuevo enlace (Link)", font=('Segoe UI', 12, 'bold'))
-        lbl.pack(pady=10)
+        main_frame = ttk.Frame(self, padding=16, style='TFrame')
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        grid_frame = tttk.Frame(self)
-        grid_frame.pack(padx=20, fill=tk.X)
+        header = ttk.Frame(main_frame, style='Card.TFrame', padding=(16, 12))
+        header.pack(fill=tk.X, pady=(0, 12))
+
+        lbl = ttk.Label(header, text="Crear nuevo enlace", style='CardTitle.TLabel')
+        lbl.pack(anchor='w')
+
+        ttk.Label(header, text="Elige el tipo de enlace y define su nombre.", style='CardSubtitle.TLabel').pack(anchor='w', pady=(4, 0))
+
+        grid_frame = ttk.Frame(main_frame, style='Card.TFrame', padding=16)
+        grid_frame.pack(fill=tk.X)
 
         # Target (readonly)
-        tttk.Label(grid_frame, text="Destino (Target):").grid(row=0, column=0, sticky='w', pady=5)
-        lbl_target = tttk.Label(grid_frame, text=self.target_path, anchor='w', justify='left')
+        ttk.Label(grid_frame, text="Destino (Target):").grid(row=0, column=0, sticky='w', pady=5)
+        lbl_target = ttk.Label(grid_frame, text=self.target_path, anchor='w', justify='left')
         lbl_target.grid(row=0, column=1, pady=5, padx=10, sticky='w')
 
         # Link Type
-        tttk.Label(grid_frame, text="Tipo de Enlace:").grid(row=1, column=0, sticky='w', pady=5)
+        ttk.Label(grid_frame, text="Tipo de Enlace:").grid(row=1, column=0, sticky='w', pady=5)
         self.link_type_var = tk.StringVar(value="symlink")
         
-        radio_frame = tttk.Frame(grid_frame)
+        radio_frame = ttk.Frame(grid_frame)
         radio_frame.grid(row=1, column=1, pady=5, padx=10, sticky='w')
         
         ttk.Radiobutton(radio_frame, text="Simbólico (Symlink)", variable=self.link_type_var, value="symlink").pack(side=tk.LEFT, padx=5)
@@ -274,24 +521,25 @@ class CreateLinkDialog(tk.Toplevel):
             ttk.Radiobutton(radio_frame, text="Unión (Junction)", variable=self.link_type_var, value="junction").pack(side=tk.LEFT, padx=5)
 
         # Link Name
-        tttk.Label(grid_frame, text="Nombre del Enlace:").grid(row=2, column=0, sticky='w', pady=5)
-        self.entry_name = ttk.Entry(grid_frame, width=40)
+        ttk.Label(grid_frame, text="Nombre del Enlace:").grid(row=2, column=0, sticky='w', pady=5)
+        self.entry_name = tk.Entry(grid_frame, width=40)
         self.entry_name.insert(0, self.target_path + "_link")
         self.entry_name.grid(row=2, column=1, pady=5, padx=10, sticky='w')
+        style_modern_entry(self.entry_name)
 
         # Buttons
-        btn_frame = tttk.Frame(self)
-        btn_frame.pack(pady=20, side=tk.BOTTOM, fill=tk.X)
+        btn_frame = ttk.Frame(main_frame, style='TFrame')
+        btn_frame.pack(pady=(14, 0), side=tk.BOTTOM, fill=tk.X)
 
-        create_btn = ttk.Button(btn_frame, text="Crear", command=self.create)
+        create_btn = ttk.Button(btn_frame, text="Crear", command=self.create, style='Accent.TButton')
         create_btn.pack(side=tk.RIGHT, padx=20)
 
         cancel_btn = ttk.Button(btn_frame, text="Cancelar", command=self.destroy)
         cancel_btn.pack(side=tk.RIGHT, padx=5)
 
     def create(self):
-        ltype = self.link_type_var.get
-        link_name = self.entry_name.get.strip
+        ltype = self.link_type_var.get()
+        link_name = self.entry_name.get().strip()
         
         if not link_name:
             messagebox.showerror("Error", "Debes especificar un nombre de enlace.")
@@ -306,13 +554,155 @@ class CreateLinkDialog(tk.Toplevel):
             messagebox.showerror("Error al crear enlace", f"Error:\n{e}")
 
 
+
+class CustomFileDialog(tk.Toplevel):
+    """
+    React-like custom file dialog replacing OS native dialogs.
+    """
+    def __init__(self, parent, initialdir, title="Seleccionar", mode='saveas', initialfile=""):
+        super().__init__(parent)
+        apply_modern_palette(self)
+        self.title(title)
+        self.geometry("650x450")
+        self.transient(parent)
+        self.grab_set()
+
+        self.current_dir = os.path.abspath(initialdir)
+        self.mode = mode
+        self.result = None
+        
+        self.configure(bg=PANEL_BG)
+        self.setup_ui()
+        self.load_directory(self.current_dir)
+        
+        if mode == 'saveas' and initialfile:
+            self.entry_name.insert(0, initialfile)
+
+        self.wait_window(self)
+
+    def setup_ui(self):
+        # Estilo React-like: Paddings amplios, fondos limpios
+        main_frame = ttk.Frame(self, padding=15, style='TFrame')
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        top_bar = ttk.Frame(main_frame, style='Card.TFrame', padding=12)
+        top_bar.pack(fill=tk.X, pady=(0, 10))
+        
+        btn_back = ttk.Button(top_bar, text="⬅ Atrás", command=self.go_up)
+        btn_back.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.path_var = tk.StringVar(value=self.current_dir)
+        path_entry = tk.Entry(top_bar, textvariable=self.path_var, font=('Segoe UI', 10))
+        style_modern_entry(path_entry, readonly=True)
+        path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Treeview content
+        tree_frame = ttk.Frame(main_frame, style='Card.TFrame')
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.tree = ttk.Treeview(tree_frame, columns=('name', 'type'), show='headings', selectmode='browse')
+        self.tree.heading('name', text='Nombre', anchor='w')
+        self.tree.heading('type', text='Tipo', anchor='w')
+        self.tree.column('name', width=450, anchor='w')
+        self.tree.column('type', width=120, anchor='w')
+        
+        scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scroll.set)
+        
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.tree.bind("<Double-1>", self.on_double_click)
+        self.tree.bind("<<TreeviewSelect>>", self.on_select)
+        
+        # Bottom bar
+        bottom_bar = ttk.Frame(main_frame, style='TFrame')
+        bottom_bar.pack(fill=tk.X, pady=(15, 0))
+        
+        if self.mode == 'saveas':
+            ttk.Label(bottom_bar, text="Nombre del archivo:", font=('Segoe UI', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 10))
+            self.entry_name = tk.Entry(bottom_bar, font=('Segoe UI', 10))
+            style_modern_entry(self.entry_name)
+            self.entry_name.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
+            ttk.Button(bottom_bar, text="Guardar", command=self.confirm, style='Accent.TButton').pack(side=tk.RIGHT)
+        else:
+            ttk.Label(bottom_bar, text="Carpeta seleccionada:", font=('Segoe UI', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 10))
+            self.entry_name = tk.Entry(bottom_bar, font=('Segoe UI', 10))
+            style_modern_entry(self.entry_name)
+            self.entry_name.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
+            ttk.Button(bottom_bar, text="Seleccionar Carpeta", command=self.confirm, style='Accent.TButton').pack(side=tk.RIGHT)
+            
+        ttk.Button(bottom_bar, text="Cancelar", command=self.destroy).pack(side=tk.RIGHT, padx=10)
+
+    def load_directory(self, path):
+        try:
+            self.current_dir = os.path.abspath(path)
+            self.path_var.set(self.current_dir)
+            if self.mode == 'directory':
+                self.entry_name.delete(0, tk.END)
+                self.entry_name.insert(0, os.path.basename(self.current_dir))
+                
+            for item in self.tree.get_children():
+                self.tree.delete(item)
+                
+            items = os.listdir(self.current_dir)
+            dirs = []
+            files = []
+            for name in items:
+                full_path = os.path.join(self.current_dir, name)
+                if os.path.isdir(full_path):
+                    dirs.append((name, full_path))
+                else:
+                    files.append((name, full_path))
+            
+            for name, full_path in sorted(dirs):
+                self.tree.insert('', tk.END, iid=full_path, values=("📁 " + name, "Carpeta"))
+            for name, full_path in sorted(files):
+                self.tree.insert('', tk.END, iid=full_path, values=("📄 " + name, "Archivo"))
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo acceder a la carpeta:\n{e}")
+            self.go_up()
+
+    def go_up(self):
+        parent = os.path.dirname(self.current_dir)
+        if parent != self.current_dir:
+            self.load_directory(parent)
+
+    def on_double_click(self, event):
+        selection = self.tree.selection()
+        if not selection: return
+        path = selection[0]
+        if os.path.isdir(path):
+            self.load_directory(path)
+
+    def on_select(self, event):
+        if self.mode == 'saveas':
+            selection = self.tree.selection()
+            if selection:
+                path = selection[0]
+                if os.path.isfile(path):
+                    self.entry_name.delete(0, tk.END)
+                    self.entry_name.insert(0, os.path.basename(path))
+
+    def confirm(self):
+        if self.mode == 'saveas':
+            filename = self.entry_name.get().strip()
+            if not filename:
+                messagebox.showerror("Error", "Debes ingresar un nombre de archivo.")
+                return
+            self.result = os.path.join(self.current_dir, filename)
+        else:
+            self.result = self.current_dir
+        self.destroy()
+
 class PyFSApp(tk.Tk):
     """
     Main PyFSManager GUI Application.
     """
     def __init__(self):
         super().__init__()
-        sv_ttk.set_theme("dark")
+        apply_modern_palette(self)
         self.title("PyFSManager - Manejador de Sistemas de Archivos")
         self.geometry("1100x700")
         self.minsize(900, 600)  # Bug 6 fix: use minsize to actually enforce the minimum window size
@@ -327,15 +717,35 @@ class PyFSApp(tk.Tk):
         self.load_directory(self.current_dir)
 
     def setup_styles(self):
-        # sv_ttk handles most styling natively. We just add minor custom font configs if needed.
-        pass
+        # All styling is centralized in apply_modern_palette(self).
+        return
 
     def setup_ui(self):
-        self.root_frame = tttk.Frame(self)
+        self.root_frame = ttk.Frame(self, style='TFrame')
         self.root_frame.pack(fill=tk.BOTH, expand=True)
+        # --- Top Banner ---
+        top_banner = ttk.Frame(self.root_frame, style='Card.TFrame', padding=(16, 14))
+        top_banner.pack(side=tk.TOP, fill=tk.X, padx=16, pady=(16, 10))
+
+        title_row = ttk.Frame(top_banner, style='Card.TFrame')
+        title_row.pack(fill=tk.X)
+
+        title_block = ttk.Frame(title_row, style='Card.TFrame')
+        title_block.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        ttk.Label(title_block, text="PyFSManager", style='Title.TLabel').pack(anchor='w')
+        ttk.Label(
+            title_block,
+            text="Explorador visual con permisos, metadatos y enlaces en una sola vista.",
+            style='Subtitle.TLabel'
+        ).pack(anchor='w', pady=(4, 0))
+
+        self.path_chip = ttk.Label(title_row, text=self.current_dir, style='Subtitle.TLabel', anchor='e', justify='right')
+        self.path_chip.pack(side=tk.RIGHT)
+
         # --- Top Menu & Address Bar ---
-        top_bar = tttk.Frame(self.root_frame, height=50)
-        top_bar.pack(side=tk.TOP, fill=tk.X)
+        top_bar = ttk.Frame(self.root_frame, style='Card.TFrame', padding=(12, 12))
+        top_bar.pack(side=tk.TOP, fill=tk.X, padx=16, pady=(0, 12))
 
         # Back (Parent) Button
         btn_back = ttk.Button(top_bar, text="⬆ Atrás", width=8, command=self.go_to_parent)
@@ -347,18 +757,20 @@ class PyFSApp(tk.Tk):
 
         # Path Entry
         self.path_var = tk.StringVar(value=self.current_dir)
-        self.entry_path = ttk.Entry(top_bar, textvariable=self.path_var, font=('Segoe UI', 10))
+        self.entry_path = tk.Entry(top_bar, textvariable=self.path_var, font=('Segoe UI', 10))
+        style_modern_entry(self.entry_path)
         self.entry_path.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10, pady=10)
         self.entry_path.bind("<Return>", lambda e: self.go_to_path(self.path_var.get()))
 
         # Search / Filter Entry
         self.filter_var = tk.StringVar(value='')
-        self.entry_search = ttk.Entry(top_bar, textvariable=self.filter_var, width=30)
+        self.entry_search = tk.Entry(top_bar, textvariable=self.filter_var, width=30)
+        style_modern_entry(self.entry_search)
         self.entry_search.pack(side=tk.RIGHT, padx=10, pady=10)
         # Mejora 4: Placeholder text for search bar
         self._search_placeholder = '\U0001f50d Filtrar...'  # magnifying glass
         self.entry_search.insert(0, self._search_placeholder)
-        self.entry_search.configure(foreground=MUTED)
+        self.entry_search.configure(fg=MUTED)
         self.entry_search.bind('<FocusIn>', self._on_search_focus_in)
         self.entry_search.bind('<FocusOut>', self._on_search_focus_out)
         self.entry_search.bind("<Return>", lambda e: self.load_directory(self.current_dir))
@@ -367,28 +779,54 @@ class PyFSApp(tk.Tk):
         self.entry_search.bind("<KeyRelease>", self._on_search_key_release)
 
         # Go Button
-        btn_go = ttk.Button(top_bar, text="Ir ➔", width=6, command=lambda: self.go_to_path(self.path_var.get()))
+        btn_go = ttk.Button(top_bar, text="Ir ➔", width=6, command=lambda: self.go_to_path(self.path_var.get()), style='Accent.TButton')
         btn_go.pack(side=tk.LEFT, padx=10, pady=10)
 
+        self.preview_visible = True
+        self.btn_preview_toggle = ttk.Button(top_bar, text="◫ Ocultar vista", command=self.toggle_preview_panel)
+        self.btn_preview_toggle.pack(side=tk.RIGHT, padx=(0, 10), pady=10)
+
+        menubar = tk.Menu(self)
+        file_menu = tk.Menu(menubar, tearoff=0)
+        open_as_menu = tk.Menu(file_menu, tearoff=0)
+        open_as_menu.add_command(label="Texto", command=self.action_open_selected_as_text)
+        open_as_menu.add_command(label="Binario / Hex", command=self.action_open_selected_as_binary)
+        open_as_menu.add_command(label="PDF", command=self.action_open_selected_as_pdf)
+        file_menu.add_command(label="Nuevo archivo", command=self.action_touch)
+        file_menu.add_command(label="Nueva carpeta", command=self.action_mkdir)
+        file_menu.add_separator()
+        file_menu.add_command(label="Abrir seleccionado", command=self.action_edit_file)
+        file_menu.add_cascade(label="Abrir como", menu=open_as_menu)
+        file_menu.add_separator()
+        file_menu.add_command(label="Recargar", command=self.refresh)
+        file_menu.add_command(label="Salir", command=self.destroy)
+
+        view_menu = tk.Menu(menubar, tearoff=0)
+        view_menu.add_command(label="Mostrar / ocultar vista previa", command=self.toggle_preview_panel)
+
+        menubar.add_cascade(label="Archivo", menu=file_menu)
+        menubar.add_cascade(label="Vista", menu=view_menu)
+        self.config(menu=menubar)
+
         # --- Main Layout Splitter ---
-        main_pane = tttk.PanedWindow(self.root_frame, orient=tk.HORIZONTAL, sashwidth=4)
+        main_pane = ttk.PanedWindow(self.root_frame, orient=tk.HORIZONTAL)
         main_pane.pack(fill=tk.BOTH, expand=True)
 
         # 1. Left Sidebar (Bookmarks / Directory tree shortcuts)
-        sidebar = tttk.Frame(main_pane, width=180)
+        sidebar = ttk.Frame(main_pane, width=180, style='Card.TFrame')
         sidebar.pack(fill=tk.BOTH, expand=True)
         main_pane.add(sidebar)
         
-        lbl_shortcuts = tttk.Label(sidebar, text="ACCESOS RÁPIDOS", style='Sidebar.TLabel')
+        lbl_shortcuts = ttk.Label(sidebar, text="ACCESOS RÁPIDOS", style='Section.TLabel')
         lbl_shortcuts.pack(anchor='w', padx=15, pady=(15, 5))
 
-        shortcuts_frame = tttk.Frame(sidebar)
+        shortcuts_frame = ttk.Frame(sidebar, style='Card.TFrame')
         shortcuts_frame.pack(fill=tk.X, padx=10)
 
         # Sidebar Shortcuts buttons
         def make_shortcut(name, path_getter):
             btn = ttk.Button(shortcuts_frame, text=name)
-            btn.configure(command=lambda: self.go_to_path(path_getter))
+            btn.configure(command=lambda: self.go_to_path(path_getter()))
             btn.pack(fill=tk.X, pady=2)
             
             # Hover effect
@@ -399,12 +837,12 @@ class PyFSApp(tk.Tk):
         make_shortcut("🖥️ Escritorio", lambda: os.path.join(os.path.expanduser("~"), "Desktop"))
         make_shortcut("📄 Documentos", lambda: os.path.join(os.path.expanduser("~"), "Documents"))
 
-        # 2. Center File list
-        center_frame = tttk.Frame(main_pane)
+        # 2. Center File list + preview
+        center_frame = ttk.Frame(main_pane, style='Card.TFrame')
         main_pane.add(center_frame)
 
         # File List Actions Header (Touch, Mkdir, Open Terminal)
-        actions_header = tttk.Frame(center_frame)
+        actions_header = ttk.Frame(center_frame, style='Card.TFrame')
         actions_header.pack(fill=tk.X, padx=10, pady=5)
         
         btn_new_file = ttk.Button(actions_header, text="📄 Nuevo Archivo", command=self.action_touch)
@@ -418,9 +856,32 @@ class PyFSApp(tk.Tk):
             btn_terminal = ttk.Button(actions_header, text="⚡ Terminal", command=self.action_open_terminal)
             btn_terminal.pack(side=tk.LEFT, padx=5)
 
-        # File Treeview
-        tree_frame = tttk.Frame(center_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        self.center_content = ttk.Frame(center_frame, style='Card.TFrame')
+        self.center_content.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        # File Treeview area
+        tree_frame = ttk.Frame(self.center_content, style='Card.TFrame', width=460)
+        tree_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Preview panel for the selected file or folder
+        self.preview_frame = ttk.Frame(self.center_content, style='Card.TFrame', width=390, padding=12)
+        self.preview_frame.pack_propagate(False)
+
+        ttk.Label(self.preview_frame, text="VISTA PREVIA", style='Section.TLabel').pack(anchor='w', pady=(0, 8))
+        self.preview_header = ttk.Label(self.preview_frame, text="Selecciona un archivo o carpeta", style='CardTitle.TLabel', wraplength=340, justify='left')
+        self.preview_header.pack(anchor='w', pady=(0, 4))
+        self.preview_meta = ttk.Label(self.preview_frame, text="", style='CardSubtitle.TLabel', wraplength=340, justify='left')
+        self.preview_meta.pack(anchor='w', pady=(0, 10))
+
+        preview_actions = ttk.Frame(self.preview_frame, style='Card.TFrame')
+        preview_actions.pack(fill=tk.X, pady=(0, 10))
+        self.btn_preview_copy = ttk.Button(preview_actions, text="Copiar ruta", command=self.copy_selected_path)
+        self.btn_preview_copy.pack(side=tk.LEFT)
+        self.btn_preview_open = ttk.Button(preview_actions, text="Abrir editor", command=self.action_edit_file, style='Accent.TButton')
+        self.btn_preview_open.pack(side=tk.RIGHT)
+
+        preview_body = ttk.Frame(self.preview_frame, style='Card.TFrame')
+        preview_body.pack(fill=tk.BOTH, expand=True)
 
         cols = ('name', 'type', 'size', 'mtime', 'ctime')
         self.tree = ttk.Treeview(tree_frame, columns=cols, show='headings', selectmode='browse')
@@ -444,26 +905,61 @@ class PyFSApp(tk.Tk):
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
+        self.preview_text = tk.Text(preview_body, font=('Consolas', 10), wrap=tk.NONE)
+        style_modern_text(self.preview_text, wrap=tk.NONE)
+        self.preview_text.configure(
+            bg=INPUT_BG,
+            fg=TEXT_PRIMARY,
+            insertbackground=TEXT_PRIMARY,
+            highlightbackground=BORDER_BG,
+            highlightcolor=ACCENT,
+            selectbackground=ACCENT,
+            selectforeground=ON_ACCENT,
+            relief='flat',
+            bd=0,
+        )
+        self.preview_text.configure(takefocus=0, cursor='arrow')
+        self.preview_text.bind('<Key>', lambda e: 'break')
+        self.preview_text.bind('<<Paste>>', lambda e: 'break')
+        self.preview_text.bind('<Control-v>', lambda e: 'break')
+        self.preview_text.bind('<Control-V>', lambda e: 'break')
+        self.preview_text.bind('<Control-a>', lambda e: 'break')
+        self.preview_text.bind('<Control-A>', lambda e: 'break')
+        self.preview_text.bind('<Control-c>', lambda e: 'break')
+        self.preview_text.bind('<Control-C>', lambda e: 'break')
+        preview_vscroll = ttk.Scrollbar(preview_body, orient=tk.VERTICAL, command=self.preview_text.yview)
+        preview_hscroll = ttk.Scrollbar(preview_body, orient=tk.HORIZONTAL, command=self.preview_text.xview)
+        self.preview_text.configure(yscrollcommand=preview_vscroll.set, xscrollcommand=preview_hscroll.set)
+        preview_body.columnconfigure(0, weight=1)
+        preview_body.rowconfigure(0, weight=1)
+        self.preview_text.grid(row=0, column=0, sticky='nsew')
+        preview_vscroll.grid(row=0, column=1, sticky='ns')
+        preview_hscroll.grid(row=1, column=0, sticky='ew')
+
         self.tree.bind("<<TreeviewSelect>>", self.on_item_select)
         self.tree.bind("<Double-1>", self.on_item_double_click)
         # Context menu (right click)
         self.tree.bind("<Button-3>", self.on_tree_right_click)
 
         # Keyboard shortcuts
-        self.bind('<Control-r>', lambda e: self.refresh)
-        self.bind('<Control-n>', lambda e: self.action_touch)
-        self.bind('<Control-Shift-N>', lambda e: self.action_mkdir)
-        self.bind('<Control-f>', lambda e: self.entry_search.focus_set)
+        self.bind('<Control-r>', lambda e: (self.refresh(), "break"))
+        self.bind('<Control-n>', lambda e: (self.action_touch(), "break"))
+        self.bind('<Control-Shift-N>', lambda e: (self.action_mkdir(), "break"))
+        self.bind('<Control-f>', lambda e: (self.entry_search.focus_set(), "break"))
+
+        if self.preview_visible:
+            self.preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10, 0))
 
         # 3. Right Details & Actions Panel
-        right_panel = tttk.Frame(main_pane, width=280)
+        right_panel = ttk.Frame(main_pane, width=280, style='Card.TFrame')
         right_panel.pack(fill=tk.BOTH, expand=True)
         main_pane.add(right_panel)
 
         self.setup_right_panel(right_panel)
 
         # --- Bottom Status Console Log ---
-        self.status_bar = tk.Text(self.root_frame, height=4, font=('Consolas', 9), padx=10, pady=5, bg='#1c1c1c', fg='#cccccc', bd=0)
+        self.status_bar = tk.Text(self.root_frame, height=4, font=('Consolas', 9), padx=10, pady=5)
+        style_modern_text(self.status_bar, readonly=True)
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
         self.log_status("Aplicación PyFSManager iniciada.")
 
@@ -471,7 +967,7 @@ class PyFSApp(tk.Tk):
         # Scrollable container for details panel in case screen is small
         canvas = tk.Canvas(parent, highlightthickness=0)
         scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scroll_frame = tttk.Frame(canvas)
+        scroll_frame = ttk.Frame(canvas)
 
         scroll_frame.bind(
             "<Configure>",
@@ -485,79 +981,97 @@ class PyFSApp(tk.Tk):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # --- Section: Metadatos ---
-        tttk.Label(scroll_frame, text="DETALLES", style='Header.TLabel').pack(anchor='w', padx=15, pady=(15, 5))
+        # --- Estilo React-like: Tarjetas (Cards) para organizar contenido ---
+        card_detalles = ttk.Frame(scroll_frame, style='Card.TFrame', padding=14)
+        card_detalles.pack(fill=tk.X, padx=15, pady=(15, 5))
         
-        self.lbl_name = tttk.Label(scroll_frame, text="Ningún elemento seleccionado", font=('Segoe UI', 10, 'bold'), wraplength=250, justify='left')
-        self.lbl_name.pack(anchor='w', padx=15, pady=2)
+        ttk.Label(card_detalles, text="DETALLES", style='Section.TLabel').pack(anchor='w', pady=(0, 10))
         
-        self.lbl_type = tttk.Label(scroll_frame, text="Tipo: -")
-        self.lbl_type.pack(anchor='w', padx=15, pady=2)
+        self.lbl_name = ttk.Label(card_detalles, text="Ningún elemento seleccionado", style='CardTitle.TLabel', wraplength=230, justify='left')
+        self.lbl_name.pack(anchor='w', pady=(0, 5))
         
-        self.lbl_nlink = tttk.Label(scroll_frame, text="Hard links: -")
-        self.lbl_nlink.pack(anchor='w', padx=15, pady=2)
+        self.lbl_type = ttk.Label(card_detalles, text="Tipo: -", style='CardSubtitle.TLabel')
+        self.lbl_type.pack(anchor='w', pady=2)
         
-        self.lbl_size = tttk.Label(scroll_frame, text="Tamaño: -")
-        self.lbl_size.pack(anchor='w', padx=15, pady=2)
+        self.lbl_nlink = ttk.Label(card_detalles, text="Hard links: -", style='CardSubtitle.TLabel')
+        self.lbl_nlink.pack(anchor='w', pady=2)
         
-        self.lbl_link = tttk.Label(scroll_frame, text="", wraplength=250, justify='left')
-        self.lbl_link.pack(anchor='w', padx=15, pady=2)
+        self.lbl_size = ttk.Label(card_detalles, text="Tamaño: -", style='CardSubtitle.TLabel')
+        self.lbl_size.pack(anchor='w', pady=2)
+        
+        self.lbl_link = ttk.Label(card_detalles, text="", style='CardSubtitle.TLabel', wraplength=230, justify='left')
+        self.lbl_link.pack(anchor='w', pady=2)
 
-        # --- Section: Tiempos ---
-        tttk.Label(scroll_frame, text="MARCAS DE TIEMPO", style='Header.TLabel').pack(anchor='w', padx=15, pady=(15, 5))
+        card_tiempos = ttk.Frame(scroll_frame, style='Card.TFrame', padding=14)
+        card_tiempos.pack(fill=tk.X, padx=15, pady=5)
         
-        self.lbl_atime = tttk.Label(scroll_frame, text="Acceso: -")
-        self.lbl_atime.pack(anchor='w', padx=15, pady=2)
-        self.lbl_mtime = tttk.Label(scroll_frame, text="Modif: -")
-        self.lbl_mtime.pack(anchor='w', padx=15, pady=2)
-        self.lbl_ctime = tttk.Label(scroll_frame, text="Cambio: -")
-        self.lbl_ctime.pack(anchor='w', padx=15, pady=2)
-        self.lbl_birth = tttk.Label(scroll_frame, text="Creado: -")
-        self.lbl_birth.pack(anchor='w', padx=15, pady=2)
+        ttk.Label(card_tiempos, text="MARCAS DE TIEMPO", style='Section.TLabel').pack(anchor='w', pady=(0, 10))
+        
+        times_grid = ttk.Frame(card_tiempos, style='Card.TFrame')
+        times_grid.pack(fill=tk.X)
+        
+        # Grid layout for perfect alignment
+        ttk.Label(times_grid, text="Acceso:", style='CardSubtitle.TLabel').grid(row=0, column=0, sticky='w', pady=2, padx=(0, 10))
+        self.lbl_atime = ttk.Label(times_grid, text="-", style='CardValue.TLabel')
+        self.lbl_atime.grid(row=0, column=1, sticky='w', pady=2)
+        
+        ttk.Label(times_grid, text="Modif:", style='CardSubtitle.TLabel').grid(row=1, column=0, sticky='w', pady=2, padx=(0, 10))
+        self.lbl_mtime = ttk.Label(times_grid, text="-", style='CardValue.TLabel')
+        self.lbl_mtime.grid(row=1, column=1, sticky='w', pady=2)
+        
+        ttk.Label(times_grid, text="Cambio:", style='CardSubtitle.TLabel').grid(row=2, column=0, sticky='w', pady=2, padx=(0, 10))
+        self.lbl_ctime = ttk.Label(times_grid, text="-", style='CardValue.TLabel')
+        self.lbl_ctime.grid(row=2, column=1, sticky='w', pady=2)
+        
+        ttk.Label(times_grid, text="Creado:", style='CardSubtitle.TLabel').grid(row=3, column=0, sticky='w', pady=2, padx=(0, 10))
+        self.lbl_birth = ttk.Label(times_grid, text="-", style='CardValue.TLabel')
+        self.lbl_birth.grid(row=3, column=1, sticky='w', pady=2)
 
-        self.btn_edit_times = ttk.Button(scroll_frame, text="⏱ Editar Tiempos", command=self.action_edit_times, state=tk.DISABLED)
-        self.btn_edit_times.pack(anchor='w', padx=15, pady=8)
+        self.btn_edit_times = ttk.Button(card_tiempos, text="⏱ Editar Tiempos", command=self.action_edit_times, state=tk.DISABLED, style='Accent.TButton')
+        self.btn_edit_times.pack(anchor='w', pady=(10, 0))
 
         # --- Section: Permisos ---
-        tttk.Label(scroll_frame, text="PERMISOS (POSIX/ACL)", style='Header.TLabel').pack(anchor='w', padx=15, pady=(10, 5))
+        card_perms = ttk.Frame(scroll_frame, style='Card.TFrame', padding=14)
+        card_perms.pack(fill=tk.X, padx=15, pady=5)
+        ttk.Label(card_perms, text="PERMISOS (POSIX/ACL)", style='Section.TLabel').pack(anchor='w', pady=(0, 10))
         
-        perms_frame = tttk.Frame(scroll_frame, padx=10, pady=10)
-        perms_frame.pack(fill=tk.X, padx=15, pady=5)
+        perms_frame = ttk.Frame(card_perms, style='Card.TFrame')
+        perms_frame.pack(fill=tk.X)
 
         # Header Row
-        tttk.Label(perms_frame, text="Rol", font=('Segoe UI', 9, 'bold')).grid(row=0, column=0, sticky='w')
-        tttk.Label(perms_frame, text="R", font=('Segoe UI', 9, 'bold')).grid(row=0, column=1, padx=5)
-        tttk.Label(perms_frame, text="W", font=('Segoe UI', 9, 'bold')).grid(row=0, column=2, padx=5)
-        tttk.Label(perms_frame, text="X", font=('Segoe UI', 9, 'bold')).grid(row=0, column=3, padx=5)
+        ttk.Label(perms_frame, text="Rol", style='CardSubtitle.TLabel').grid(row=0, column=0, sticky='w')
+        ttk.Label(perms_frame, text="R", style='CardSubtitle.TLabel').grid(row=0, column=1, padx=5)
+        ttk.Label(perms_frame, text="W", style='CardSubtitle.TLabel').grid(row=0, column=2, padx=5)
+        ttk.Label(perms_frame, text="X", style='CardSubtitle.TLabel').grid(row=0, column=3, padx=5)
 
         # Variables for checkboxes
         self.chk_vars = {
-            'u': [tk.BooleanVar for _ in range(3)],
-            'g': [tk.BooleanVar for _ in range(3)],
-            'o': [tk.BooleanVar for _ in range(3)]
+            'u': [tk.BooleanVar(value=False) for _ in range(3)],
+            'g': [tk.BooleanVar(value=False) for _ in range(3)],
+            'o': [tk.BooleanVar(value=False) for _ in range(3)]
         }
 
         # Checkboxes
         roles = [('Usuario (u)', 'u', 1), ('Grupo (g)', 'g', 2), ('Otros (o)', 'o', 3)]
         for label, key, row in roles:
-            tttk.Label(perms_frame, text=label, font=('Segoe UI', 9)).grid(row=row, column=0, sticky='w', pady=2)
+            ttk.Label(perms_frame, text=label, style='CardSubtitle.TLabel').grid(row=row, column=0, sticky='w', pady=2)
             for i in range(3):
                 chk = ttk.Checkbutton(
                     perms_frame, 
-                    variable=self.chk_vars[key][i], 
-                    
-                    bd=0
+                    variable=self.chk_vars[key][i]
                 )
                 chk.grid(row=row, column=i+1, pady=2)
 
-        self.btn_apply_perms = ttk.Button(scroll_frame, text="✓ Aplicar Permisos", command=self.action_apply_permissions, state=tk.DISABLED)
-        self.btn_apply_perms.pack(anchor='w', padx=15, pady=5)
+        self.btn_apply_perms = ttk.Button(card_perms, text="✓ Aplicar Permisos", command=self.action_apply_permissions, state=tk.DISABLED, style='Accent.TButton')
+        self.btn_apply_perms.pack(anchor='w', pady=(10, 0))
 
         # --- Section: Acciones ---
-        tttk.Label(scroll_frame, text="ACCIONES", style='Header.TLabel').pack(anchor='w', padx=15, pady=(15, 5))
+        card_acciones = ttk.Frame(scroll_frame, style='Card.TFrame', padding=14)
+        card_acciones.pack(fill=tk.X, padx=15, pady=5)
+        ttk.Label(card_acciones, text="ACCIONES", style='Section.TLabel').pack(anchor='w', pady=(0, 10))
         
-        actions_grid = tttk.Frame(scroll_frame)
-        actions_grid.pack(fill=tk.X, padx=15, pady=5)
+        actions_grid = ttk.Frame(card_acciones, style='Card.TFrame')
+        actions_grid.pack(fill=tk.X)
 
         self.btn_copy = ttk.Button(actions_grid, text="📄 Copiar", command=self.action_copy, state=tk.DISABLED)
         self.btn_copy.grid(row=0, column=0, padx=2, pady=4, sticky='ew')
@@ -571,11 +1085,126 @@ class PyFSApp(tk.Tk):
         self.btn_delete = ttk.Button(actions_grid, text="🗑 Eliminar", command=self.action_delete, state=tk.DISABLED)
         self.btn_delete.grid(row=1, column=1, padx=2, pady=4, sticky='ew')
 
-        self.btn_link = ttk.Button(scroll_frame, text="🔗 Crear Enlace (Link)", command=self.action_create_link, state=tk.DISABLED)
-        self.btn_link.pack(anchor='w', padx=15, pady=5, fill=tk.X)
+        self.btn_link = ttk.Button(card_acciones, text="🔗 Crear Enlace (Link)", command=self.action_create_link, state=tk.DISABLED, style='Accent.TButton')
+        self.btn_link.pack(anchor='w', fill=tk.X, pady=(5,0))
 
         actions_grid.columnconfigure(0, weight=1)
         actions_grid.columnconfigure(1, weight=1)
+
+    def copy_selected_path(self):
+        if not self.selected_item:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(self.selected_item)
+        self.log_status(f"Ruta copiada: {self.selected_item}")
+
+    def toggle_preview_panel(self):
+        if not hasattr(self, 'preview_frame'):
+            return
+        if self.preview_visible:
+            self.preview_frame.pack_forget()
+            self.btn_preview_toggle.configure(text="◫ Mostrar vista")
+        else:
+            self.preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10, 0))
+            self.preview_frame.pack_propagate(False)
+            self.btn_preview_toggle.configure(text="◫ Ocultar vista")
+        self.preview_visible = not self.preview_visible
+
+    def clear_preview(self, message: str = "Selecciona un archivo o carpeta"):
+        if not hasattr(self, 'preview_header'):
+            return
+        self.preview_header.configure(text=message)
+        self.preview_meta.configure(text="")
+        self.preview_text.delete("1.0", tk.END)
+        self.preview_text.insert(tk.END, "La vista previa aparecerá aquí.\n\nTip: usa doble clic para abrir archivos o Enter para entrar en carpetas.")
+
+    def update_preview(self, meta: Optional[FileMetadata], error_message: Optional[str] = None):
+        if not hasattr(self, 'preview_header'):
+            return
+
+        self.preview_text.delete("1.0", tk.END)
+
+        if error_message:
+            self.preview_header.configure(text="No se pudo cargar la vista previa")
+            self.preview_meta.configure(text=error_message)
+            self.preview_text.insert(tk.END, error_message)
+            return
+
+        if not meta:
+            self.clear_preview()
+            return
+
+        self.preview_header.configure(text=meta.name)
+        self.preview_meta.configure(text=f"{meta.type.upper()} · {format_size(meta.size)} · {meta.path}")
+        self.btn_preview_copy.configure(state=tk.NORMAL)
+
+        if os.path.isdir(meta.path):
+            self.btn_preview_open.configure(text="Entrar carpeta", command=lambda p=meta.path: self.go_to_path(p), state=tk.NORMAL)
+        else:
+            from .utils import detect_file_type
+            if detect_file_type(meta.path) == 'document':
+                self.btn_preview_open.configure(text="Abrir externamente", command=lambda p=meta.path: self.action_open_external(p), state=tk.NORMAL)
+            else:
+                self.btn_preview_open.configure(text="Abrir editor", command=self.action_edit_file, state=tk.NORMAL)
+
+        try:
+            if meta.type in ('directory', 'junction'):
+                try:
+                    entries = list(os.scandir(meta.path))
+                    directories = sum(1 for entry in entries if entry.is_dir(follow_symlinks=False))
+                    files = sum(1 for entry in entries if entry.is_file(follow_symlinks=False))
+                    preview_names = [entry.name for entry in entries[:20]]
+                    text = [
+                        f"Carpeta: {meta.path}",
+                        f"Elementos: {len(entries)}",
+                        f"Subcarpetas: {directories}",
+                        f"Archivos: {files}",
+                        "",
+                        "Primeros elementos:",
+                    ]
+                    text.extend(f"- {name}" for name in preview_names)
+                    self.preview_text.insert(tk.END, "\n".join(text))
+                except Exception as e:
+                    self.preview_text.insert(tk.END, f"No se pudo resumir la carpeta:\n{e}")
+            else:
+                from .utils import detect_file_type, detect_encoding
+                from .cli import hex_dump
+
+                ftype = detect_file_type(meta.path)
+                if ftype == 'pdf':
+                    try:
+                        from pypdf import PdfReader
+                        reader = PdfReader(meta.path)
+                        pages = []
+                        for page in reader.pages[:2]:
+                            pages.append(page.extract_text() or "(sin texto extraíble en esta página)")
+                        self.preview_text.insert(tk.END, f"PDF · Páginas: {len(reader.pages)}\n\n" + "\n\n--- Página ---\n\n".join(pages))
+                    except Exception as e:
+                        self.preview_text.insert(tk.END, f"No se pudo leer el PDF:\n{e}")
+                    return
+                if ftype == 'document':
+                    self.preview_text.insert(
+                        tk.END,
+                        "Formato de documento detectado.\n\n"
+                        "PyFSManager no lo renderiza internamente. Usa 'Abrir externamente' para abrirlo con la app predeterminada."
+                    )
+                    return
+                if ftype == 'binary':
+                    with open(meta.path, 'rb') as f:
+                        data = f.read(1024)
+                    self.preview_text.insert(tk.END, "Vista previa binaria (primeros 1024 bytes)\n\n")
+                    self.preview_text.insert(tk.END, hex_dump(data, max_bytes=1024))
+                else:
+                    encoding = detect_encoding(meta.path)
+                    with open(meta.path, 'r', encoding=encoding, errors='replace') as f:
+                        text = f.read(6000)
+                    if not text:
+                        text = "(archivo vacío)"
+                    self.preview_text.insert(tk.END, text)
+                    if meta.size > 6000:
+                        self.preview_text.insert(tk.END, f"\n\n... vista previa truncada ({format_size(meta.size)} total) ...")
+        except Exception as e:
+            self.preview_text.insert(tk.END, f"No se pudo generar la vista previa:\n{e}")
 
     # --- UI Logic ---
 
@@ -598,9 +1227,11 @@ class PyFSApp(tk.Tk):
 
             self.current_dir = path
             self.path_var.set(self.current_dir)
+            if hasattr(self, 'path_chip'):
+                self.path_chip.configure(text=self.current_dir)
             
             # Clear treeview
-            for child in self.tree.get_children:
+            for child in self.tree.get_children():
                 self.tree.delete(child)
 
             # Read items
@@ -620,7 +1251,7 @@ class PyFSApp(tk.Tk):
             # Sort items: directory, junction, symlink, others... then alphabetically
             def sort_key(meta: FileMetadata):
                 type_order = {'directory': 0, 'junction': 1, 'symlink': 2, 'fifo': 3, 'socket': 4, 'regular': 5, 'unknown': 6}
-                return (type_order.get(meta.type, 9), meta.name.lower)
+                return (type_order.get(meta.type, 9), meta.name.lower())
 
             item_metas.sort(key=sort_key)
 
@@ -634,8 +1265,8 @@ class PyFSApp(tk.Tk):
                 else: prefix = "📄 "
 
                 # Apply search filter if present, ignoring the placeholder text
-                filt = self.filter_var.get.strip.lower
-                if filt and filt != self._search_placeholder.strip.lower and filt not in meta.name.lower:
+                filt = self.filter_var.get().strip().lower()
+                if filt and filt != self._search_placeholder.strip().lower() and filt not in meta.name.lower():
                     continue
 
                 display_name = prefix + meta.name
@@ -647,17 +1278,17 @@ class PyFSApp(tk.Tk):
                     '', 
                     tk.END, 
                     iid=meta.path, 
-                    values=(display_name, meta.type.upper, size_str, mtime_str, ctime_str)
+                    values=(display_name, meta.type.upper(), size_str, mtime_str, ctime_str)
                 )
 
             # Select item if specified
-            if select_path and select_path in self.tree.get_children:
+            if select_path and select_path in self.tree.get_children():
                 self.tree.selection_set(select_path)
                 self.tree.focus(select_path)
                 self.tree.see(select_path)
                 self.on_item_select(None)
             else:
-                self.clear_selection
+                self.clear_selection()
 
             self.log_status(f"Directorio cargado: {self.current_dir}")
         except Exception as e:
@@ -674,10 +1305,10 @@ class PyFSApp(tk.Tk):
         self.lbl_size.configure(text="Tamaño: -")
         self.lbl_link.configure(text="")
         
-        self.lbl_atime.configure(text="Acceso: -")
-        self.lbl_mtime.configure(text="Modif: -")
-        self.lbl_ctime.configure(text="Cambio: -")
-        self.lbl_birth.configure(text="Creado: -")
+        self.lbl_atime.configure(text="-")
+        self.lbl_mtime.configure(text="-")
+        self.lbl_ctime.configure(text="-")
+        self.lbl_birth.configure(text="-")
 
         # Disable checkboxes & buttons
         for key in self.chk_vars:
@@ -691,11 +1322,16 @@ class PyFSApp(tk.Tk):
         self.btn_rename.configure(state=tk.DISABLED)
         self.btn_delete.configure(state=tk.DISABLED)
         self.btn_link.configure(state=tk.DISABLED)
+        if hasattr(self, 'btn_preview_copy'):
+            self.btn_preview_copy.configure(state=tk.DISABLED)
+        if hasattr(self, 'btn_preview_open'):
+            self.btn_preview_open.configure(state=tk.DISABLED, text="Abrir editor", command=self.action_edit_file)
+        self.update_preview(None)
 
     def on_item_select(self, event):
-        selection = self.tree.selection
+        selection = self.tree.selection()
         if not selection:
-            self.clear_selection
+            self.clear_selection()
             return
 
         filepath = selection[0]
@@ -707,7 +1343,7 @@ class PyFSApp(tk.Tk):
             
             # Update labels
             self.lbl_name.configure(text=meta.name)
-            self.lbl_type.configure(text=f"Tipo: {meta.type.upper}")
+            self.lbl_type.configure(text=f"Tipo: {meta.type.upper()}")
             self.lbl_nlink.configure(text=f"Hard links: {meta.nlink}")
             self.lbl_size.configure(text=f"Tamaño: {meta.size} bytes ({format_size(meta.size)})")
             
@@ -716,14 +1352,14 @@ class PyFSApp(tk.Tk):
             else:
                 self.lbl_link.configure(text="")
 
-            self.lbl_atime.configure(text=f"Acceso: {format_time(meta.atime)}")
-            self.lbl_mtime.configure(text=f"Modif: {format_time(meta.mtime)}")
-            self.lbl_ctime.configure(text=f"Cambio: {format_time(meta.ctime)}")
+            self.lbl_atime.configure(text=format_time(meta.atime))
+            self.lbl_mtime.configure(text=format_time(meta.mtime))
+            self.lbl_ctime.configure(text=format_time(meta.ctime))
             
             if meta.birthtime:
-                self.lbl_birth.configure(text=f"Creado: {format_time(meta.birthtime)}")
+                self.lbl_birth.configure(text=format_time(meta.birthtime))
             else:
-                self.lbl_birth.configure(text="Creado: N/D")
+                self.lbl_birth.configure(text="N/D")
 
             # Enable/Update permissions checkboxes
             perms = meta.permissions
@@ -745,8 +1381,11 @@ class PyFSApp(tk.Tk):
             self.btn_rename.configure(state=tk.NORMAL)
             self.btn_delete.configure(state=tk.NORMAL)
             self.btn_link.configure(state=tk.NORMAL)
+
+            self.update_preview(meta)
         except Exception as e:
             self.log_status(f"Error al leer metadatos de '{filepath}': {e}", is_error=True)
+            self.update_preview(None, error_message=str(e))
 
     def on_item_double_click(self, event):
         if not self.selected_item:
@@ -763,14 +1402,19 @@ class PyFSApp(tk.Tk):
             if os.path.isdir(self.selected_item):
                 self.go_to_path(self.selected_item)
             else:
-                self.action_edit_file
+                self.action_edit_file()
         elif meta.type == 'regular':
-            self.action_edit_file
+            from .utils import detect_file_type
+            if detect_file_type(self.selected_item) == 'document':
+                self.action_open_external(self.selected_item)
+            else:
+                self.action_edit_file()
 
     def on_tree_right_click(self, event):
         # Identify the row under cursor
         row_id = self.tree.identify_row(event.y)
         if not row_id:
+            self.show_empty_space_context_menu(event)
             return
         # Select it and refresh the detail panel (Bug 7 fix)
         self.tree.selection_set(row_id)
@@ -783,19 +1427,89 @@ class PyFSApp(tk.Tk):
 
         # Build context menu
         menu = tk.Menu(self, tearoff=0)
+        style_modern_menu(menu)
         menu.add_command(label="Abrir / Editar", command=self.action_edit_file)
+        menu.add_command(label="Abrir externamente", command=self.action_open_external)
         menu.add_command(label="Copiar", command=self.action_copy)
         menu.add_command(label="Mover", command=self.action_move)
         menu.add_command(label="Renombrar", command=self.action_rename)
-        menu.add_separator
+        menu.add_separator()
+        menu.add_command(label="Propiedades", command=self.action_selected_properties)
+        menu.add_separator()
         menu.add_command(label="Eliminar", command=self.action_delete)
-        menu.add_separator
+        menu.add_separator()
         menu.add_command(label="Crear Enlace...", command=self.action_create_link)
 
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
-            menu.grab_release
+            menu.grab_release()
+
+    def show_empty_space_context_menu(self, event):
+        menu = tk.Menu(self, tearoff=0)
+        style_modern_menu(menu)
+        menu.add_command(label="📄 Nuevo Archivo", command=self.action_touch)
+        menu.add_command(label="📁 Nueva Carpeta", command=self.action_mkdir)
+        menu.add_separator()
+        menu.add_command(label="⟳ Recargar", command=self.refresh)
+        menu.add_separator()
+        menu.add_command(label="⚙ Propiedades de esta carpeta", command=self.action_current_dir_properties)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def action_current_dir_properties(self):
+        try:
+            meta = FSManager.get_metadata(self.current_dir)
+            
+            prop_dialog = tk.Toplevel(self)
+            apply_modern_palette(prop_dialog)
+            prop_dialog.title(f"Propiedades - {os.path.basename(self.current_dir)}")
+            prop_dialog.geometry("460x300")
+            prop_dialog.resizable(False, False)
+            prop_dialog.transient(self)
+            prop_dialog.grab_set()
+            
+            frame = ttk.Frame(prop_dialog, style='TFrame', padding=16)
+            frame.pack(fill=tk.BOTH, expand=True)
+            
+            header = ttk.Frame(frame, style='Card.TFrame', padding=(16, 12))
+            header.pack(fill=tk.X, pady=(0, 12))
+
+            ttk.Label(header, text="Propiedades de la carpeta", style='CardTitle.TLabel').pack(anchor='w')
+            ttk.Label(header, text=f"📁 {os.path.basename(self.current_dir)}", style='CardSubtitle.TLabel').pack(anchor='w', pady=(4, 0))
+            
+            grid = ttk.Frame(frame, style='Card.TFrame', padding=14)
+            grid.pack(fill=tk.X)
+            
+            ttk.Label(grid, text="Ruta:", style='CardSubtitle.TLabel').grid(row=0, column=0, sticky='w', pady=5, padx=(0,10))
+            path_lbl = ttk.Label(grid, text=self.current_dir, style='CardValue.TLabel', wraplength=310)
+            path_lbl.grid(row=0, column=1, sticky='w', pady=5)
+            
+            ttk.Label(grid, text="Tamaño:", style='CardSubtitle.TLabel').grid(row=1, column=0, sticky='w', pady=5, padx=(0,10))
+            ttk.Label(grid, text=format_size(meta.size), style='CardValue.TLabel').grid(row=1, column=1, sticky='w', pady=5)
+            
+            ttk.Label(grid, text="Modificado:", style='CardSubtitle.TLabel').grid(row=2, column=0, sticky='w', pady=5, padx=(0,10))
+            ttk.Label(grid, text=format_time(meta.mtime), style='CardValue.TLabel').grid(row=2, column=1, sticky='w', pady=5)
+
+            ttk.Label(grid, text="Tipo:", style='CardSubtitle.TLabel').grid(row=3, column=0, sticky='w', pady=5, padx=(0,10))
+            ttk.Label(grid, text=meta.type.upper(), style='CardValue.TLabel').grid(row=3, column=1, sticky='w', pady=5)
+
+            button_row = ttk.Frame(frame, style='TFrame')
+            button_row.pack(fill=tk.X, pady=(14, 0))
+
+            def copy_current_path():
+                self.clipboard_clear()
+                self.clipboard_append(self.current_dir)
+                self.log_status(f"Ruta copiada al portapapeles: {self.current_dir}")
+
+            ttk.Button(button_row, text="Copiar ruta", command=copy_current_path).pack(side=tk.LEFT)
+            
+            ttk.Button(button_row, text="Cerrar", command=prop_dialog.destroy, style='Accent.TButton').pack(side=tk.RIGHT)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudieron obtener las propiedades:\n{e}")
 
     def go_to_parent(self):
         parent = os.path.dirname(self.current_dir)
@@ -819,32 +1533,36 @@ class PyFSApp(tk.Tk):
 
     def _on_search_focus_in(self, event):
         """Clear placeholder text when search entry gains focus."""
-        if self.filter_var.get == self._search_placeholder:
+        if self.filter_var.get() == self._search_placeholder:
             self.entry_search.delete(0, tk.END)
-            self.entry_search.configure(foreground=ON_ACCENT)
+            self.entry_search.configure(fg=TEXT_PRIMARY)
 
     def _on_search_focus_out(self, event):
         """Restore placeholder text when search entry loses focus and is empty."""
-        if not self.filter_var.get.strip:
+        if not self.filter_var.get().strip():
             self.entry_search.insert(0, self._search_placeholder)
-            self.entry_search.configure(foreground=MUTED)
+            self.entry_search.configure(fg=MUTED)
 
     # --- Actions ---
 
     def action_touch(self):
-        filename = filedialog.asksaveasfilename(
-            initialdir=self.current_dir,
-            title="Crear Nuevo Archivo",
-            confirmoverwrite=True
+        from tkinter import simpledialog
+        filename = simpledialog.askstring(
+            "Crear Nuevo Archivo",
+            "Nombre del archivo nuevo:",
+            initialvalue="nuevo_archivo.txt",
+            parent=self,
         )
-        if filename:
-            try:
-                FSManager.touch(filename)
-                self.log_status(f"Archivo creado: {filename}")
-                self.load_directory(self.current_dir, select_path=os.path.abspath(filename))
-            except Exception as e:
-                self.log_status(f"Error al crear archivo: {e}", is_error=True)
-                messagebox.showerror("Error", f"No se pudo crear el archivo:\n{e}")
+        if not filename:
+            return
+        path = os.path.join(self.current_dir, filename.strip())
+        try:
+            FSManager.touch(path)
+            self.log_status(f"Archivo creado: {path}")
+            self.load_directory(self.current_dir, select_path=os.path.abspath(path))
+        except Exception as e:
+            self.log_status(f"Error al crear archivo: {e}", is_error=True)
+            messagebox.showerror("Error", f"No se pudo crear el archivo:\n{e}")
 
     def action_open_terminal(self):
         """Open a PowerShell window in the current directory (Windows only)."""
@@ -873,18 +1591,95 @@ class PyFSApp(tk.Tk):
                 self.log_status(f"Error al crear directorio: {e}", is_error=True)
                 messagebox.showerror("Error", f"No se pudo crear la carpeta:\n{e}")
 
-    def action_edit_file(self):
+    def action_edit_file(self, view_mode: str = 'auto'):
         if not self.selected_item:
             return
-        editor = FileEditorWindow(self, self.selected_item)
+        from .utils import detect_file_type
+        if view_mode == 'auto' and detect_file_type(self.selected_item) == 'document':
+            self.action_open_external(self.selected_item)
+            return
+        editor = FileEditorWindow(self, self.selected_item, view_mode=view_mode)
         # Center dialog
-        editor.geometry("+%d+%d" % (self.winfo_x + 100, self.winfo_y + 50))
+        editor.geometry("+%d+%d" % (self.winfo_x() + 100, self.winfo_y() + 50))
+
+    def action_open_selected_as_text(self):
+        self.action_edit_file('text')
+
+    def action_open_selected_as_binary(self):
+        self.action_edit_file('binary')
+
+    def action_open_selected_as_pdf(self):
+        self.action_edit_file('pdf')
+
+    def action_open_external(self, path: Optional[str] = None):
+        target = os.path.abspath(path or self.selected_item or "")
+        if not target:
+            return
+        try:
+            if sys.platform == 'win32':
+                os.startfile(target)
+            else:
+                import subprocess
+                subprocess.Popen(['xdg-open', target])
+            self.log_status(f"Abierto externamente: {target}")
+        except Exception as e:
+            self.log_status(f"No se pudo abrir externamente: {e}", is_error=True)
+            messagebox.showerror("Error", f"No se pudo abrir el archivo con la aplicación predeterminada:\n{e}")
+
+    def action_selected_properties(self):
+        if not self.selected_item:
+            return
+        try:
+            meta = FSManager.get_metadata(self.selected_item)
+
+            prop_dialog = tk.Toplevel(self)
+            apply_modern_palette(prop_dialog)
+            prop_dialog.title(f"Propiedades - {meta.name}")
+            prop_dialog.geometry("500x330")
+            prop_dialog.resizable(False, False)
+            prop_dialog.transient(self)
+            prop_dialog.grab_set()
+
+            frame = ttk.Frame(prop_dialog, style='TFrame', padding=16)
+            frame.pack(fill=tk.BOTH, expand=True)
+
+            header = ttk.Frame(frame, style='Card.TFrame', padding=(16, 12))
+            header.pack(fill=tk.X, pady=(0, 12))
+
+            ttk.Label(header, text="Propiedades del archivo", style='CardTitle.TLabel').pack(anchor='w')
+            ttk.Label(header, text=meta.name, style='CardSubtitle.TLabel').pack(anchor='w', pady=(4, 0))
+
+            grid = ttk.Frame(frame, style='Card.TFrame', padding=14)
+            grid.pack(fill=tk.X)
+
+            rows = [
+                ("Ruta:", self.selected_item),
+                ("Tipo:", meta.type.upper()),
+                ("Tamaño:", format_size(meta.size)),
+                ("Modificado:", format_time(meta.mtime)),
+                ("Creado:", format_time(meta.birthtime) if meta.birthtime else "N/D"),
+                ("Hard links:", str(meta.nlink)),
+            ]
+            if meta.link_target:
+                rows.append(("Destino:", meta.link_target))
+
+            for row_index, (label_text, value_text) in enumerate(rows):
+                ttk.Label(grid, text=label_text, style='CardSubtitle.TLabel').grid(row=row_index, column=0, sticky='w', pady=5, padx=(0,10))
+                ttk.Label(grid, text=value_text, style='CardValue.TLabel', wraplength=360, justify='left').grid(row=row_index, column=1, sticky='w', pady=5)
+
+            button_row = ttk.Frame(frame, style='TFrame')
+            button_row.pack(fill=tk.X, pady=(14, 0))
+
+            ttk.Button(button_row, text="Abrir externamente", command=lambda: self.action_open_external(self.selected_item)).pack(side=tk.LEFT)
+            ttk.Button(button_row, text="Cerrar", command=prop_dialog.destroy, style='Accent.TButton').pack(side=tk.RIGHT)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudieron obtener las propiedades del archivo:\n{e}")
 
     def action_edit_times(self):
         if not self.selected_item or not self.selected_meta:
             return
         dialog = EditTimesDialog(self, self.selected_item, self.selected_meta, self.refresh)
-        dialog.geometry("+%d+%d" % (self.winfo_x + 200, self.winfo_y + 150))
+        dialog.geometry("+%d+%d" % (self.winfo_x() + 200, self.winfo_y() + 150))
 
     def action_apply_permissions(self):
         if not self.selected_item:
@@ -892,9 +1687,9 @@ class PyFSApp(tk.Tk):
             
         # Build rwx strings
         def get_rwx_str(vars_list):
-            r = 'r' if vars_list[0].get else '-'
-            w = 'w' if vars_list[1].get else '-'
-            x = 'x' if vars_list[2].get else '-'
+            r = 'r' if vars_list[0].get() else '-'
+            w = 'w' if vars_list[1].get() else '-'
+            x = 'x' if vars_list[2].get() else '-'
             return r + w + x
 
         u_str = get_rwx_str(self.chk_vars['u'])
@@ -916,19 +1711,12 @@ class PyFSApp(tk.Tk):
     def action_copy(self):
         if not self.selected_item:
             return
-        # Bug 8 fix: use askdirectory for directories, asksaveasfilename for files
         if self.selected_meta and self.selected_meta.type in ('directory', 'junction'):
-            dst = filedialog.askdirectory(
-                initialdir=os.path.dirname(self.selected_item),
-                title="Copiar carpeta a...",
-                mustexist=False
-            )
+            dialog = CustomFileDialog(self, os.path.dirname(self.selected_item), title="Copiar carpeta a...", mode='directory')
+            dst = dialog.result
         else:
-            dst = filedialog.asksaveasfilename(
-                initialdir=self.current_dir,
-                title="Copiar elemento a...",
-                initialfile=os.path.basename(self.selected_item)
-            )
+            dialog = CustomFileDialog(self, self.current_dir, title="Copiar elemento a...", mode='saveas', initialfile=os.path.basename(self.selected_item))
+            dst = dialog.result
         if dst:
             try:
                 FSManager.copy(self.selected_item, dst)
@@ -941,11 +1729,8 @@ class PyFSApp(tk.Tk):
     def action_move(self):
         if not self.selected_item:
             return
-        dst = filedialog.asksaveasfilename(
-            initialdir=self.current_dir,
-            title="Mover elemento a...",
-            initialfile=os.path.basename(self.selected_item)
-        )
+        dialog = CustomFileDialog(self, self.current_dir, title="Mover elemento a...", mode='saveas', initialfile=os.path.basename(self.selected_item))
+        dst = dialog.result
         if dst:
             try:
                 FSManager.move(self.selected_item, dst)
@@ -992,12 +1777,12 @@ class PyFSApp(tk.Tk):
         if not self.selected_item:
             return
         dialog = CreateLinkDialog(self, self.selected_item, self.refresh)
-        dialog.geometry("+%d+%d" % (self.winfo_x + 200, self.winfo_y + 150))
+        dialog.geometry("+%d+%d" % (self.winfo_x() + 200, self.winfo_y() + 150))
 
 
 def main():
-    app = PyFSApp
-    app.mainloop
+    app = PyFSApp()
+    app.mainloop()
 
 if __name__ == '__main__':
-    main
+    main()
