@@ -394,9 +394,15 @@ class EditTimesDialog(tk.Toplevel):
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
 
     def parse_time_str(self, time_str: str) -> Optional[float]:
-        time_str = time_str.strip
+        # Ensure we call strip() and handle empty inputs
+        try:
+            time_str = time_str.strip()
+        except Exception:
+            time_str = ''
+
         if not time_str:
             return None
+
         try:
             struct = time.strptime(time_str, "%Y-%m-%d %H:%M:%S")
             return time.mktime(struct)
@@ -460,12 +466,21 @@ class EditTimesDialog(tk.Toplevel):
             birthtime = None
             if self.meta.birthtime and self.entry_birth.get().strip():
                 birthtime = self.parse_time_str(self.entry_birth.get())
+            try:
+                FSManager.set_times(self.filepath, atime=atime, mtime=mtime, birthtime=birthtime)
+            except Exception as e:
+                # Log detailed error to status and show friendly message
+                parent = self.master if hasattr(self, 'master') else None
+                if parent and hasattr(parent, 'log_status'):
+                    parent.log_status(f"Error aplicando tiempos a '{self.filepath}': {e}", is_error=True)
+                messagebox.showerror("Error", f"No se pudieron aplicar las marcas de tiempo al archivo:\n{os.path.basename(self.filepath)}\n\nDetalle: {e}")
+                return
 
-            FSManager.set_times(self.filepath, atime=atime, mtime=mtime, birthtime=birthtime)
             self.on_save()
             self.destroy()
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al guardar marcas de tiempo:\n{e}")
+        except ValueError as e:
+            # Parsing error: show clear message about the offending field
+            messagebox.showerror("Formato incorrecto", f"Error de formato al interpretar las fechas:\n{e}")
 
 
 class CreateLinkDialog(tk.Toplevel):
@@ -1785,12 +1800,40 @@ class PyFSApp(tk.Tk):
         
         perms = FilePermissions(u_str, g_str, o_str)
 
+        # Normalize selected item to absolute path and ensure it matches a Treeview iid
+        selected_abs = os.path.abspath(self.selected_item)
+        if selected_abs not in self.tree.get_children():
+            # Sometimes selection can be stale or the tree uses a different representation
+            # Try to find a matching child by comparing basenames as a fallback
+            matches = [c for c in self.tree.get_children() if os.path.basename(c) == os.path.basename(selected_abs)]
+            if matches:
+                # Prefer exact match if available, otherwise pick first
+                selected_abs = matches[0]
+            else:
+                self.log_status(f"No se puede aplicar permisos: selección desincronizada: {self.selected_item}", is_error=True)
+                messagebox.showerror("Error", f"No se pueden cambiar los permisos:\nElemento no encontrado en la vista:\n{self.selected_item}\nRecarga el directorio e inténtalo de nuevo.")
+                self.refresh()
+                return
+
         try:
-            FSManager.set_permissions(self.selected_item, perms)
-            self.log_status(f"Permisos aplicados a '{self.selected_item}': {perms.to_symbolic}")
+            if not os.path.exists(selected_abs):
+                self.log_status(f"No se puede aplicar permisos: elemento no encontrado: {selected_abs}", is_error=True)
+                messagebox.showerror("Error", f"No se pueden cambiar los permisos:\nElemento no encontrado:\n{selected_abs}\nRecarga el directorio e inténtalo de nuevo.")
+                self.refresh()
+                return
+
+            # Log the iid and normalized path for debugging before applying
+            try:
+                self.log_status(f"Aplicando permisos -> iid: {selected_abs} | ruta_normalizada: {os.path.abspath(selected_abs)} | modo: {perms.to_symbolic()}")
+            except Exception:
+                # Ensure logging never blocks the operation
+                pass
+
+            FSManager.set_permissions(selected_abs, perms)
+            self.log_status(f"Permisos aplicados a '{selected_abs}': {perms.to_symbolic()}")
             self.refresh()
             # Select item again to reload display
-            self.tree.selection_set(self.selected_item)
+            self.tree.selection_set(selected_abs)
         except Exception as e:
             self.log_status(f"Error al aplicar permisos: {e}", is_error=True)
             messagebox.showerror("Error", f"No se pudieron cambiar los permisos:\n{e}")

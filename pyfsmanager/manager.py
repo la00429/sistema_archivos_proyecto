@@ -145,6 +145,14 @@ class FSManager:
             os.utime(path, None)
         else:
             cls._log(f"touch {path}", "openat(2) + utimensat(2)")
+            # Ensure parent directories exist so touch works on nested paths
+            parent = os.path.dirname(path)
+            if parent:
+                try:
+                    os.makedirs(parent, exist_ok=True)
+                except Exception:
+                    # If creating parents fails, let the underlying open() raise
+                    pass
             with open(path, 'w', encoding='utf-8') as f:
                 pass
 
@@ -199,9 +207,16 @@ class FSManager:
             raise NotADirectoryError(f"Not a directory: {path}")
 
         import datetime
-        import pwd
-        import grp
         import stat as stat_mod
+        # pwd/grp are POSIX-only; import conditionally and fall back to numeric ids on Windows
+        try:
+            import pwd
+            import grp
+            _HAS_PWD = True
+        except Exception:
+            pwd = None
+            grp = None
+            _HAS_PWD = False
 
         lines = []
         try:
@@ -223,9 +238,20 @@ class FSManager:
                 mode_str = is_dir + perms
 
                 try:
-                    user = pwd.getpwuid(st.st_uid).pw_name
-                    group = grp.getgrgid(st.st_gid).gr_name
-                except (KeyError, ImportError):
+                    if _HAS_PWD and pwd is not None and grp is not None:
+                        user = pwd.getpwuid(st.st_uid).pw_name
+                        group = grp.getgrgid(st.st_gid).gr_name
+                    else:
+                        # Fallback for Windows: show numeric ids or environment username
+                        try:
+                            user = os.environ.get('USERNAME') or os.environ.get('USER') or str(st.st_uid)
+                        except Exception:
+                            user = str(st.st_uid)
+                        try:
+                            group = str(st.st_gid)
+                        except Exception:
+                            group = str(st.st_gid)
+                except Exception:
                     user = str(st.st_uid)
                     group = str(st.st_gid)
 

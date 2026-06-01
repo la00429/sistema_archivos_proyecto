@@ -368,12 +368,26 @@ def _get_current_username() -> str:
     Returns the current username robustly, without relying on os.getlogin()
     which can fail when there is no controlling TTY (e.g. Windows services, CI).
     """
-    name = os.environ.get('USERNAME') or os.environ.get('USER')
-    if name:
+    import getpass
+
+    # Prefer getpass.getuser() which is robust across platforms and environments
+    try:
+        name = getpass.getuser()
+    except Exception:
+        name = None
+
+    # Treat obvious invalid sentinel values as missing
+    if name and str(name).strip().lower() not in ('none', ''):
         return name
+
+    # Fallbacks: check common environment variables, then os.getlogin(), then fallback string
+    name = os.environ.get('USERNAME') or os.environ.get('USER')
+    if name and str(name).strip().lower() not in ('none', ''):
+        return name
+
     try:
         return os.getlogin()
-    except OSError:
+    except Exception:
         return 'UNKNOWN'
 
 
