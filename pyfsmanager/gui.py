@@ -1841,16 +1841,35 @@ class PyFSApp(tk.Tk):
     def action_copy(self):
         if not self.selected_item:
             return
+
+        def get_copy_name(src_path, dst_folder):
+            base = os.path.basename(src_path)
+            name, ext = os.path.splitext(base)
+            counter = 1
+            new_name = f"{name} - copia{ext}"
+            new_path = os.path.join(dst_folder, new_name)
+            while os.path.exists(new_path):
+                new_name = f"{name} - copia ({counter}){ext}"
+                new_path = os.path.join(dst_folder, new_name)
+                counter += 1
+            return new_path
+
         if self.selected_meta and self.selected_meta.type in ('directory', 'junction'):
             dialog = CustomFileDialog(self, os.path.dirname(self.selected_item), title="Copiar carpeta a...", mode='directory')
             dst = dialog.result
+            if dst and os.path.abspath(self.selected_item) == os.path.abspath(dst):
+                # If same folder, we need a new name for the folder
+                dst = get_copy_name(self.selected_item, os.path.dirname(self.selected_item))
         else:
             dialog = CustomFileDialog(self, self.current_dir, title="Copiar elemento a...", mode='saveas', initialfile=os.path.basename(self.selected_item))
             dst = dialog.result
+            if dst and os.path.abspath(self.selected_item) == os.path.abspath(dst):
+                dst = get_copy_name(self.selected_item, os.path.dirname(self.selected_item))
+
         if dst:
             try:
+                self.log_shell_command(f"cp -rp {os.path.basename(self.selected_item)} {os.path.basename(dst)}")
                 FSManager.copy(self.selected_item, dst)
-                self.log_status(f"Elemento copiado de '{self.selected_item}' a '{dst}'")
                 self.refresh()
             except Exception as e:
                 self.log_status(f"Error al copiar: {e}", is_error=True)
@@ -1862,9 +1881,11 @@ class PyFSApp(tk.Tk):
         dialog = CustomFileDialog(self, self.current_dir, title="Mover elemento a...", mode='saveas', initialfile=os.path.basename(self.selected_item))
         dst = dialog.result
         if dst:
+            if os.path.abspath(self.selected_item) == os.path.abspath(dst):
+                return # No-op if same path
             try:
+                self.log_shell_command(f"mv {os.path.basename(self.selected_item)} {os.path.basename(dst)}")
                 FSManager.move(self.selected_item, dst)
-                self.log_status(f"Elemento movido de '{self.selected_item}' a '{dst}'")
                 self.refresh()
             except Exception as e:
                 self.log_status(f"Error al mover: {e}", is_error=True)
