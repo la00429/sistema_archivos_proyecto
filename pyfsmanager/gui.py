@@ -810,40 +810,45 @@ class PyFSApp(tk.Tk):
         menubar.add_cascade(label="Vista", menu=view_menu)
         self.config(menu=menubar)
 
-        # --- Main Layout Splitter ---
-        main_pane = ttk.PanedWindow(self.root_frame, orient=tk.HORIZONTAL)
-        main_pane.pack(fill=tk.BOTH, expand=True)
+        # --- Main Layout Splitter (Horizontal) ---
+        self.main_h_pane = ttk.PanedWindow(self.root_frame, orient=tk.HORIZONTAL)
+        self.main_h_pane.pack(fill=tk.BOTH, expand=True)
 
-        # 1. Left Sidebar (Bookmarks / Directory tree shortcuts)
-        sidebar = ttk.Frame(main_pane, width=180, style='Card.TFrame')
-        sidebar.pack(fill=tk.BOTH, expand=True)
-        main_pane.add(sidebar)
-        
+        # 1. Left Sidebar
+        sidebar = ttk.Frame(self.main_h_pane, width=180, style='Card.TFrame')
+        self.main_h_pane.add(sidebar)
+
+        # 2. Center & Bottom Splitter (Vertical)
+        center_v_pane = ttk.PanedWindow(self.main_h_pane, orient=tk.VERTICAL)
+        self.main_h_pane.add(center_v_pane)
+
+        # Container for the file list area
+        content_container = ttk.Frame(center_v_pane, style='Card.TFrame')
+        center_v_pane.add(content_container, weight=3)
+
+        # 3. Right Details & Actions Panel
+        right_panel = ttk.Frame(self.main_h_pane, width=280, style='Card.TFrame')
+        self.main_h_pane.add(right_panel)
+
+        # Sidebar content
         lbl_shortcuts = ttk.Label(sidebar, text="ACCESOS RÁPIDOS", style='Section.TLabel')
         lbl_shortcuts.pack(anchor='w', padx=15, pady=(15, 5))
-
+        
         shortcuts_frame = ttk.Frame(sidebar, style='Card.TFrame')
         shortcuts_frame.pack(fill=tk.X, padx=10)
 
-        # Sidebar Shortcuts buttons
         def make_shortcut(name, path_getter):
             btn = ttk.Button(shortcuts_frame, text=name)
             btn.configure(command=lambda: self.go_to_path(path_getter()))
             btn.pack(fill=tk.X, pady=2)
-            
-            # Hover effect
-            
 
         make_shortcut("📁 Espacio Trabajo", lambda: os.getcwd())
         make_shortcut("🏠 Inicio (Home)", lambda: os.path.expanduser("~"))
         make_shortcut("🖥️ Escritorio", lambda: os.path.join(os.path.expanduser("~"), "Desktop"))
         make_shortcut("📄 Documentos", lambda: os.path.join(os.path.expanduser("~"), "Documents"))
 
-        # 2. Center File list + preview
-        center_frame = ttk.Frame(main_pane, style='Card.TFrame')
-        main_pane.add(center_frame)
-
-        # File List Actions Header (Touch, Mkdir, Open Terminal)
+        # Center area content (File list Actions Header)
+        center_frame = content_container # Redirecting center_frame to content_container
         actions_header = ttk.Frame(center_frame, style='Card.TFrame')
         actions_header.pack(fill=tk.X, padx=10, pady=5)
         
@@ -853,7 +858,6 @@ class PyFSApp(tk.Tk):
         btn_new_folder = ttk.Button(actions_header, text="📁 Nueva Carpeta", command=self.action_mkdir)
         btn_new_folder.pack(side=tk.LEFT, padx=5)
 
-        # Mejora 3: Open Terminal button (Windows only)
         if sys.platform == 'win32':
             btn_terminal = ttk.Button(actions_header, text="⚡ Terminal", command=self.action_open_terminal)
             btn_terminal.pack(side=tk.LEFT, padx=5)
@@ -865,7 +869,7 @@ class PyFSApp(tk.Tk):
         tree_frame = ttk.Frame(self.center_content, style='Card.TFrame', width=460)
         tree_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Preview panel for the selected file or folder
+        # Preview panel
         self.preview_frame = ttk.Frame(self.center_content, style='Card.TFrame', width=390, padding=12)
         self.preview_frame.pack_propagate(False)
 
@@ -900,7 +904,6 @@ class PyFSApp(tk.Tk):
         self.tree.column('mtime', width=140, anchor='w')
         self.tree.column('ctime', width=140, anchor='w')
 
-        # Treeview scrollbar
         tree_scroll = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=tree_scroll.set)
         
@@ -909,17 +912,6 @@ class PyFSApp(tk.Tk):
 
         self.preview_text = tk.Text(preview_body, font=('Consolas', 10), wrap=tk.NONE)
         style_modern_text(self.preview_text, wrap=tk.NONE)
-        self.preview_text.configure(
-            bg=INPUT_BG,
-            fg=TEXT_PRIMARY,
-            insertbackground=TEXT_PRIMARY,
-            highlightbackground=BORDER_BG,
-            highlightcolor=ACCENT,
-            selectbackground=ACCENT,
-            selectforeground=ON_ACCENT,
-            relief='flat',
-            bd=0,
-        )
         self.preview_text.configure(takefocus=0, cursor='arrow')
         self.preview_text.bind('<Key>', lambda e: 'break')
         self.preview_text.bind('<<Paste>>', lambda e: 'break')
@@ -940,10 +932,8 @@ class PyFSApp(tk.Tk):
 
         self.tree.bind("<<TreeviewSelect>>", self.on_item_select)
         self.tree.bind("<Double-1>", self.on_item_double_click)
-        # Context menu (right click)
         self.tree.bind("<Button-3>", self.on_tree_right_click)
 
-        # Keyboard shortcuts
         self.bind('<Control-r>', lambda e: (self.refresh(), "break"))
         self.bind('<Control-n>', lambda e: (self.action_touch(), "break"))
         self.bind('<Control-Shift-N>', lambda e: (self.action_mkdir(), "break"))
@@ -952,18 +942,26 @@ class PyFSApp(tk.Tk):
         if self.preview_visible:
             self.preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10, 0))
 
-        # 3. Right Details & Actions Panel
-        right_panel = ttk.Frame(main_pane, width=280, style='Card.TFrame')
-        right_panel.pack(fill=tk.BOTH, expand=True)
-        main_pane.add(right_panel)
+        # --- Bottom Status Console Log (Terminal) ---
+        terminal_container = ttk.Frame(center_v_pane, style='Card.TFrame', padding=(0, 0, 0, 10))
+        center_v_pane.add(terminal_container, weight=1)
 
-        self.setup_right_panel(right_panel)
-
-        # --- Bottom Status Console Log ---
-        self.status_bar = tk.Text(self.root_frame, height=4, font=('Consolas', 9), padx=10, pady=5)
+        self.status_bar = tk.Text(terminal_container, height=6, font=('Consolas', 9), padx=10, pady=5)
         style_modern_text(self.status_bar, readonly=True)
-        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.status_bar.pack(fill=tk.BOTH, expand=True, padx=10)
+
+        # --- Right Panel content ---
+        self.setup_right_panel(right_panel)
+        
         self.log_status("Aplicación PyFSManager iniciada.")
+    
+    def toggle_preview_panel(self):
+        if self.preview_visible:
+            self.preview_frame.pack_forget()
+        else:
+            self.preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10, 0))
+        self.preview_visible = not self.preview_visible
+        self.btn_preview_toggle.configure(text="◫ Mostrar vista" if not self.preview_visible else "◫ Ocultar vista")
 
     def setup_right_panel(self, parent):
         # Scrollable container for details panel in case screen is small
@@ -1210,6 +1208,17 @@ class PyFSApp(tk.Tk):
 
     # --- UI Logic ---
 
+    def _get_shell_prompt(self):
+        username = os.environ.get('USER', 'user')
+        hostname = os.uname().nodename if hasattr(os, 'uname') else 'linux'
+        home = os.path.expanduser('~')
+        display_path = self.current_dir.replace(home, '~') if self.current_dir.startswith(home) else self.current_dir
+        return f"\033[01;32m{username}@{hostname}\033[00m:\033[01;34m{display_path}\033[00m$ "
+
+    def log_shell_command(self, cmd: str):
+        prompt = self._get_shell_prompt()
+        self.log_status(f"SHELL_SIMULATE: {prompt}{cmd}")
+
     def log_status(self, msg: str, is_error: bool = False):
         # Bash Simulation Mode
         if msg.startswith("SHELL_SIMULATE:"):
@@ -1267,18 +1276,9 @@ class PyFSApp(tk.Tk):
             items = os.listdir(self.current_dir)
             
             # Show shell-like prompt and ls -la output
-            username = os.environ.get('USER', 'user')
-            hostname = os.uname().nodename if hasattr(os, 'uname') else 'linux'
-            # Shorten home path to ~
-            home = os.path.expanduser('~')
-            display_path = self.current_dir.replace(home, '~') if self.current_dir.startswith(home) else self.current_dir
-            
-            prompt = f"\033[01;32m{username}@{hostname}\033[00m:\033[01;34m{display_path}\033[00m$ "
-            
             try:
                 ls_output = FSManager.load_directory_ls(self.current_dir)
-                # We use a special marker to tell log_status this is a BASH simulation
-                self.log_status(f"SHELL_SIMULATE: {prompt}ls -la\n{ls_output}")
+                self.log_shell_command(f"ls -la\n{ls_output}")
             except Exception as e:
                 self.log_status(f"Error generating ls -la: {e}", is_error=True)
 
@@ -1567,6 +1567,10 @@ class PyFSApp(tk.Tk):
 
     def go_to_path(self, path: str):
         path = os.path.abspath(path)
+        # Log cd simulation
+        if path != self.current_dir:
+            dirname = os.path.basename(path) or path
+            self.log_shell_command(f"cd {dirname}")
         self.load_directory(path)
 
     def refresh(self):
@@ -1604,8 +1608,8 @@ class PyFSApp(tk.Tk):
             return
         path = os.path.join(self.current_dir, filename.strip())
         try:
+            self.log_shell_command(f"touch {filename.strip()}")
             FSManager.touch(path)
-            self.log_status(f"Archivo creado: {path}")
             self.load_directory(self.current_dir, select_path=os.path.abspath(path))
         except Exception as e:
             self.log_status(f"Error al crear archivo: {e}", is_error=True)
@@ -1631,8 +1635,8 @@ class PyFSApp(tk.Tk):
         if foldername:
             path = os.path.join(self.current_dir, foldername)
             try:
+                self.log_shell_command(f"mkdir {foldername}")
                 FSManager.mkdir(path)
-                self.log_status(f"Directorio creado: {path}")
                 self.load_directory(self.current_dir, select_path=os.path.abspath(path))
             except Exception as e:
                 self.log_status(f"Error al crear directorio: {e}", is_error=True)
@@ -1648,9 +1652,13 @@ class PyFSApp(tk.Tk):
             return
 
         from .utils import detect_file_type
+        filename = os.path.basename(self.selected_item)
         if view_mode == 'auto' and detect_file_type(self.selected_item) == 'document':
+            self.log_shell_command(f"xdg-open {filename}")
             self.action_open_external(self.selected_item)
             return
+        
+        self.log_shell_command(f"nano {filename}")
         editor = FileEditorWindow(self, self.selected_item, view_mode=view_mode)
         # Center dialog
         editor.geometry("+%d+%d" % (self.winfo_x() + 100, self.winfo_y() + 50))
@@ -1802,8 +1810,8 @@ class PyFSApp(tk.Tk):
         if new_name and new_name != old_name:
             dst = os.path.join(os.path.dirname(self.selected_item), new_name)
             try:
+                self.log_shell_command(f"mv {old_name} {new_name}")
                 FSManager.move(self.selected_item, dst)
-                self.log_status(f"Renombrado de '{old_name}' a '{new_name}'")
                 self.refresh()
             except Exception as e:
                 self.log_status(f"Error al renombrar: {e}", is_error=True)
@@ -1819,8 +1827,8 @@ class PyFSApp(tk.Tk):
         )
         if confirm:
             try:
+                self.log_shell_command(f"rm {name}")
                 FSManager.delete(self.selected_item)
-                self.log_status(f"Eliminado: {self.selected_item}")
                 self.refresh()
             except Exception as e:
                 self.log_status(f"Error al eliminar: {e}", is_error=True)
