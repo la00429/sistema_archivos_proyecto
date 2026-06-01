@@ -828,7 +828,7 @@ class PyFSApp(tk.Tk):
 
         # 3. Right Details & Actions Panel
         right_panel = ttk.Frame(self.main_h_pane, width=280, style='Card.TFrame')
-        self.main_h_pane.add(right_panel)
+        self.main_h_pane.add(right_panel, weight=0)
 
         # Sidebar content
         lbl_shortcuts = ttk.Label(sidebar, text="ACCESOS RÁPIDOS", style='Section.TLabel')
@@ -862,16 +862,19 @@ class PyFSApp(tk.Tk):
             btn_terminal = ttk.Button(actions_header, text="⚡ Terminal", command=self.action_open_terminal)
             btn_terminal.pack(side=tk.LEFT, padx=5)
 
-        self.center_content = ttk.Frame(center_frame, style='Card.TFrame')
-        self.center_content.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # --- Sub-Splitter for Treeview and Preview ---
+        # Replacing self.center_content with a PanedWindow
+        self.center_pane = ttk.PanedWindow(center_frame, orient=tk.HORIZONTAL)
+        self.center_pane.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
         # File Treeview area
-        tree_frame = ttk.Frame(self.center_content, style='Card.TFrame', width=460)
-        tree_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        tree_frame = ttk.Frame(self.center_pane, style='Card.TFrame')
+        self.center_pane.add(tree_frame, weight=3)
 
         # Preview panel
-        self.preview_frame = ttk.Frame(self.center_content, style='Card.TFrame', width=390, padding=12)
-        self.preview_frame.pack_propagate(False)
+        self.preview_frame = ttk.Frame(self.center_pane, style='Card.TFrame', padding=12)
+        # We don't pack it anymore, we add it to the pane
+        # self.preview_frame.pack_propagate(False) # Removed to allow pane control
 
         ttk.Label(self.preview_frame, text="VISTA PREVIA", style='Section.TLabel').pack(anchor='w', pady=(0, 8))
         self.preview_header = ttk.Label(self.preview_frame, text="Selecciona un archivo o carpeta", style='CardTitle.TLabel', wraplength=340, justify='left')
@@ -940,7 +943,7 @@ class PyFSApp(tk.Tk):
         self.bind('<Control-f>', lambda e: (self.entry_search.focus_set(), "break"))
 
         if self.preview_visible:
-            self.preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10, 0))
+            self.center_pane.add(self.preview_frame, weight=2)
 
         # --- Bottom Status Console Log (Terminal) ---
         terminal_container = ttk.Frame(center_v_pane, style='Card.TFrame', padding=(0, 0, 0, 10))
@@ -964,22 +967,41 @@ class PyFSApp(tk.Tk):
         self.btn_preview_toggle.configure(text="◫ Mostrar vista" if not self.preview_visible else "◫ Ocultar vista")
 
     def setup_right_panel(self, parent):
-        # Scrollable container for details panel in case screen is small
-        canvas = tk.Canvas(parent, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scroll_frame = ttk.Frame(canvas)
+        # Container to hold both canvas and scrollbar
+        container = ttk.Frame(parent, style='Card.TFrame')
+        container.pack(fill=tk.BOTH, expand=True)
 
-        scroll_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(
-                scrollregion=canvas.bbox("all")
-            )
-        )
-        canvas.create_window((0, 0), window=scroll_frame, anchor="nw", width=280)
+        # Ensure the parent (right_panel) doesn't restrict its children
+        parent.pack_propagate(False)
+
+        canvas = tk.Canvas(container, highlightthickness=0, bg=CARD_BG)
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        
+        # We need a container frame for the scroll_frame to manage padding properly
+        scroll_frame = ttk.Frame(canvas, style='Card.TFrame')
+
+        def _configure_canvas(event):
+            # Update scroll region
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            # Dynamically update the width of the inner window to match the canvas
+            canvas.itemconfig(canvas_window, width=event.width)
+
+        canvas.bind("<Configure>", _configure_canvas)
+        
+        canvas_window = canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # Use pack with fill and side to ensure scrollbar is ALWAYS visible on the right
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Mouse wheel support
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        # Bind to canvas and scroll_frame specifically for reliability
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        scroll_frame.bind("<MouseWheel>", _on_mousewheel)
 
         # --- Estilo React-like: Tarjetas (Cards) para organizar contenido ---
         card_detalles = ttk.Frame(scroll_frame, style='Card.TFrame', padding=14)
@@ -1088,6 +1110,9 @@ class PyFSApp(tk.Tk):
         self.btn_link = ttk.Button(card_acciones, text="🔗 Crear Enlace (Link)", command=self.action_create_link, state=tk.DISABLED, style='Accent.TButton')
         self.btn_link.pack(anchor='w', fill=tk.X, pady=(5,0))
 
+        # Bottom space for scrolling
+        ttk.Frame(scroll_frame, height=40, style='Card.TFrame').pack()
+
         actions_grid.columnconfigure(0, weight=1)
         actions_grid.columnconfigure(1, weight=1)
 
@@ -1102,11 +1127,12 @@ class PyFSApp(tk.Tk):
         if not hasattr(self, 'preview_frame'):
             return
         if self.preview_visible:
-            self.preview_frame.pack_forget()
+            # Check if it's currently managed by the pane
+            if self.preview_frame in self.center_pane.panes():
+                self.center_pane.forget(self.preview_frame)
             self.btn_preview_toggle.configure(text="◫ Mostrar vista")
         else:
-            self.preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10, 0))
-            self.preview_frame.pack_propagate(False)
+            self.center_pane.add(self.preview_frame, weight=2)
             self.btn_preview_toggle.configure(text="◫ Ocultar vista")
         self.preview_visible = not self.preview_visible
 
