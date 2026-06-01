@@ -16,24 +16,44 @@ from .links import (
 )
 
 class FSManager:
-    @staticmethod
-    def get_metadata(path: str) -> FileMetadata:
+    _log_callback = None
+
+    @classmethod
+    def set_log_callback(cls, callback):
+        cls._log_callback = callback
+
+    @classmethod
+    def _log(cls, cmd: str, syscall: str):
+        if cls._log_callback:
+            # Enviar directamente el comando y la syscall sin prefijos internos
+            cls._log_callback(f"{cmd} | Syscall: {syscall}")
+
+    @classmethod
+    def get_metadata(cls, path: str, silent: bool = False) -> FileMetadata:
         """
         Retrieves complete metadata for the given path.
+        
+        Syscall: newfstatat(2)
+        Comando: stat <path>
         """
+        if not silent:
+            cls._log(f"stat {path}", "newfstatat(2)")
         return get_metadata(path)
 
-    @staticmethod
-    def set_permissions(path: str, permissions: Union[FilePermissions, int, str]) -> None:
+    @classmethod
+    def set_permissions(cls, path: str, permissions: Union[FilePermissions, int, str]) -> None:
         """
         Sets permissions on a file or directory.
-        Accepts FilePermissions, octal int (e.g. 0o755), octal string ('755'),
-        symbolic permission string ('rwxr-xr-x'), or chmod expression ('u+w,go-rx').
+        
+        Syscall: fchmodat(2)
+        Comando: chmod <perms> <path>
         """
+        cls._log(f"chmod {permissions} {path}", "fchmodat(2)")
         set_file_permissions(path, permissions)
 
-    @staticmethod
+    @classmethod
     def set_times(
+        cls, 
         path: str, 
         atime: Optional[float] = None, 
         mtime: Optional[float] = None, 
@@ -41,30 +61,43 @@ class FSManager:
     ) -> None:
         """
         Sets access (atime), modification (mtime), and creation (birthtime) timestamps.
+        
+        Syscall: utimensat(2)
+        Comando: touch -a -m -t <time> <path>
         """
+        cls._log(f"touch {path}", "utimensat(2)")
         set_file_times(path, atime, mtime, birthtime)
 
-    @staticmethod
-    def create_link(link_type: str, src: str, dst: str) -> None:
+    @classmethod
+    def create_link(cls, link_type: str, src: str, dst: str) -> None:
         """
-        Creates a link. link_type can be 'hard', 'symlink' (or 'sym'), or 'junction'.
+        Creates a link.
+        
+        Syscall: linkat(2) / symlinkat(2)
+        Comando: ln <src> <dst>
         """
         link_type = link_type.lower()
         if link_type == 'hard':
+            cls._log(f"ln {src} {dst}", "linkat(2)")
             create_hard_link(src, dst)
         elif link_type in ('symlink', 'sym'):
+            cls._log(f"ln -s {src} {dst}", "symlinkat(2)")
             create_symbolic_link(src, dst)
         elif link_type == 'junction':
+            cls._log(f"mklink /J {dst} {src}", "NTFS Junction")
             create_junction(src, dst)
         else:
-            raise ValueError(f"Unknown link type: {link_type}. Supported: hard, symlink, junction.")
+            raise ValueError(f"Unknown link type: {link_type}.")
 
     @classmethod
     def read_file(cls, path: str) -> Union[str, bytes]:
         """
-        Reads file content. Detects text vs binary automatically.
-        If it's text, it decodes and returns a string. If it's binary, it returns bytes.
+        Reads file content.
+        
+        Syscall: openat(2) + read(2)
+        Comando: cat <path>
         """
+        cls._log(f"cat {path}", "openat(2) + read(2)")
         if not os.path.exists(path):
             raise FileNotFoundError(f"File not found: {path}")
             
@@ -77,17 +110,15 @@ class FSManager:
             with open(path, 'r', encoding=encoding, errors='replace') as f:
                 return f.read()
 
-    @staticmethod
-    def write_file(path: str, content: Union[str, bytes], encoding: Optional[str] = None) -> None:
+    @classmethod
+    def write_file(cls, path: str, content: Union[str, bytes], encoding: Optional[str] = None) -> None:
         """
         Writes content to a file.
-        If content is a string, writes in text mode (using detected or specified encoding).
-        If content is bytes, writes in binary mode.
-
-        Note: when the detected encoding is 'utf-8-sig' (UTF-8 with BOM) and the
-        file already exists, we write with plain 'utf-8' to avoid re-inserting the
-        BOM and duplicating it. The BOM is only needed on the first byte of a new file.
+        
+        Syscall: openat(2) + write(2)
+        Comando: echo <content> > <path>
         """
+        cls._log(f"echo ... > {path}", "openat(2) + write(2)")
         if isinstance(content, bytes):
             with open(path, 'wb') as f:
                 f.write(content)
@@ -97,28 +128,35 @@ class FSManager:
                     encoding = detect_encoding(path)
                 else:
                     encoding = 'utf-8'
-            # Bug 9 fix: utf-8-sig re-inserts the BOM on every write, duplicating it
-            # when overwriting an existing BOM file. Use plain utf-8 for overwrite.
             write_encoding = 'utf-8' if (encoding == 'utf-8-sig' and os.path.exists(path)) else encoding
             with open(path, 'w', encoding=write_encoding, errors='replace') as f:
                 f.write(content)
 
-    @staticmethod
-    def touch(path: str) -> None:
+    @classmethod
+    def touch(cls, path: str) -> None:
         """
-        Creates an empty file if it doesn't exist, or updates its atime and mtime to current.
+        Creates an empty file if it doesn't exist.
+        
+        Syscall: openat(2) + utimensat(2)
+        Comando: touch <path>
         """
         if os.path.exists(path):
+            cls._log(f"touch {path}", "utimensat(2)")
             os.utime(path, None)
         else:
+            cls._log(f"touch {path}", "openat(2) + utimensat(2)")
             with open(path, 'w', encoding='utf-8') as f:
                 pass
 
-    @staticmethod
-    def mkdir(path: str, recursive: bool = True) -> None:
+    @classmethod
+    def mkdir(cls, path: str, recursive: bool = True) -> None:
         """
-        Creates a directory. By default creates parent directories recursively.
+        Creates a directory.
+        
+        Syscall: mkdirat(2)
+        Comando: mkdir -p <path>
         """
+        cls._log(f"mkdir {'-p' if recursive else ''} {path}", "mkdirat(2)")
         if recursive:
             os.makedirs(path, exist_ok=True)
         else:
@@ -127,49 +165,105 @@ class FSManager:
     @classmethod
     def delete(cls, path: str) -> None:
         """
-        Deletes a file, directory, symlink, or junction.
-        Handles nested items and prevents recursion into symlinks/junctions.
+        Deletes a file or directory.
+        
+        Syscall: unlinkat(2) / rmdir(2)
+        Comando: rm -rf <path>
         """
         if not os.path.exists(path) and not os.path.islink(path):
             raise FileNotFoundError(f"Path not found: {path}")
 
         if is_junction(path) or os.path.islink(path):
+            cls._log(f"rm {path}", "unlinkat(2)")
             if sys.platform == 'win32' and os.path.isdir(path):
-                os.rmdir(path)  # removes junctions and directory symlinks
+                os.rmdir(path)
             else:
-                os.unlink(path)  # removes file symlinks/links
+                os.unlink(path)
         elif os.path.isdir(path):
-            # To be extra safe with nested junctions inside a directory,
-            # we traverse and delete links first, then delete the rest.
+            cls._log(f"rm -rf {path}", "unlinkat(2) + rmdir(2)")
             cls._delete_tree_custom(path)
         else:
+            cls._log(f"rm {path}", "unlinkat(2)")
             os.unlink(path)
 
     @classmethod
-    def _delete_tree_custom(cls, path: str) -> None:
+    def load_directory_ls(cls, path: str) -> str:
         """
-        Helper that recursively deletes directory contents,
-        ensuring junctions/symlinks are unlinked rather than traversed.
+        Simulates 'ls -la' output.
+        
+        Syscall: getdents64(2) + newfstatat(2)
+        Comando: ls -la <path>
         """
-        for item in os.listdir(path):
-            item_path = os.path.join(path, item)
-            if is_junction(item_path) or os.path.islink(item_path):
-                if sys.platform == 'win32' and os.path.isdir(item_path):
-                    os.rmdir(item_path)
-                else:
-                    os.unlink(item_path)
-            elif os.path.isdir(item_path):
-                cls._delete_tree_custom(item_path)
-            else:
-                os.unlink(item_path)
-        os.rmdir(path)
+        # Note: We don't log here because gui.py handles the full shell simulation log
+        if not os.path.isdir(path):
+            raise NotADirectoryError(f"Not a directory: {path}")
+
+        import datetime
+        import pwd
+        import grp
+        import stat as stat_mod
+
+        lines = []
+        try:
+            items = ['.', '..'] + sorted(os.listdir(path))
+        except PermissionError:
+            return "ls: permission denied"
+        
+        for item in items:
+            p = os.path.join(path, item)
+            try:
+                st = os.lstat(p)
+                
+                # POSIX mode string
+                is_dir = 'd' if os.path.isdir(p) else '-'
+                if os.path.islink(p): is_dir = 'l'
+                
+                mode = stat_mod.S_IMODE(st.st_mode)
+                perms = FilePermissions.from_octal(mode).to_symbolic()
+                mode_str = is_dir + perms
+
+                try:
+                    user = pwd.getpwuid(st.st_uid).pw_name
+                    group = grp.getgrgid(st.st_gid).gr_name
+                except (KeyError, ImportError):
+                    user = str(st.st_uid)
+                    group = str(st.st_gid)
+
+                # Format size like ls -lh
+                def fmt_size(b):
+                    for u in ['B','K','M','G']:
+                        if b < 1024: return f"{b}{u}" if u=='B' else f"{b:.1f}{u}"
+                        b /= 1024
+                    return f"{b:.1f}T"
+                
+                size = fmt_size(st.st_size)
+                mtime = datetime.datetime.fromtimestamp(st.st_mtime)
+                time_str = mtime.strftime("%b %d %H:%M")
+
+                icon = "" if os.path.isdir(p) else ""
+                if os.path.islink(p): icon = "🔗"
+                
+                name = item
+                if os.path.islink(p):
+                    try:
+                        target = os.readlink(p)
+                        name = f"{item} -> {target}"
+                    except OSError: pass
+
+                lines.append(f"{mode_str} {user} {group} {size:>6} {time_str} {icon} {name}")
+            except Exception: continue
+
+        return "\n".join(lines)
 
     @classmethod
     def copy(cls, src: str, dst: str) -> None:
         """
-        Copies a file, directory, symlink, or junction.
-        Recreates junctions and symlinks instead of copying their targets.
+        Copies a file or directory.
+        
+        Syscall: openat(2) + read(2) + write(2)
+        Comando: cp -rp <src> <dst>
         """
+        cls._log(f"cp -rp {src} {dst}", "openat(2) + read(2) + write(2)")
         if not os.path.exists(src) and not os.path.islink(src):
             raise FileNotFoundError(f"Source path not found: {src}")
 
@@ -185,30 +279,14 @@ class FSManager:
             shutil.copy2(src, dst)
 
     @classmethod
-    def _copy_tree_custom(cls, src_dir: str, dst_dir: str) -> None:
-        """
-        Helper that recursively copies a directory, recreating junctions and symlinks.
-        """
-        os.makedirs(dst_dir, exist_ok=True)
-        for item in os.listdir(src_dir):
-            s_item = os.path.join(src_dir, item)
-            d_item = os.path.join(dst_dir, item)
-            if is_junction(s_item):
-                target = read_link(s_item)
-                create_junction(target, d_item)
-            elif is_symlink(s_item):
-                target = read_link(s_item)
-                create_symbolic_link(target, d_item, is_dir=os.path.isdir(s_item))
-            elif os.path.isdir(s_item):
-                cls._copy_tree_custom(s_item, d_item)
-            else:
-                shutil.copy2(s_item, d_item)
-
-    @staticmethod
-    def move(src: str, dst: str) -> None:
+    def move(cls, src: str, dst: str) -> None:
         """
         Moves (renames) a file or directory.
+        
+        Syscall: renameat2(2)
+        Comando: mv <src> <dst>
         """
+        cls._log(f"mv {src} {dst}", "renameat2(2)")
         if not os.path.exists(src) and not os.path.islink(src):
             raise FileNotFoundError(f"Source path not found: {src}")
         shutil.move(src, dst)

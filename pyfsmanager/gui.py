@@ -707,6 +707,8 @@ class PyFSApp(tk.Tk):
         self.geometry("1100x700")
         self.minsize(900, 600)  # Bug 6 fix: use minsize to actually enforce the minimum window size
         
+        # Link FSManager log callback to our log_status
+        FSManager.set_log_callback(self.log_status)
         
         self.current_dir = os.path.abspath(os.getcwd())
         self.selected_item: Optional[str] = None
@@ -1209,6 +1211,33 @@ class PyFSApp(tk.Tk):
     # --- UI Logic ---
 
     def log_status(self, msg: str, is_error: bool = False):
+        # Bash Simulation Mode
+        if msg.startswith("SHELL_SIMULATE:"):
+            content = msg.replace("SHELL_SIMULATE: ", "", 1)
+            self.status_bar.configure(state=tk.NORMAL)
+            
+            import re
+            clean_content = re.sub(r'\033\[[0-9;]*m', '', content)
+            
+            self.status_bar.insert(tk.END, clean_content + "\n")
+            self.status_bar.see(tk.END)
+            self.status_bar.configure(state=tk.DISABLED)
+            return
+
+        # Handle Syscall Logs (format as comments or hidden in shell view)
+        if " | Syscall: " in msg:
+            # Format: # [EJECUTANDO] <cmd> | Syscall: <syscall>
+            # To make it look like a shell comment/debug line
+            self.status_bar.configure(state=tk.NORMAL)
+            self.status_bar.insert(tk.END, f"# [DEBUG] {msg}\n")
+            self.status_bar.see(tk.END)
+            self.status_bar.configure(state=tk.DISABLED)
+            return
+
+        # Ignore redundant "OK" logs if we're in shell mode
+        if msg.startswith("Directorio cargado:") or msg.startswith("Listing directory:"):
+            return
+
         t_str = time.strftime("%H:%M:%S")
         prefix = f"[{t_str}] [ERROR] " if is_error else f"[{t_str}] [OK] "
         
@@ -1237,12 +1266,29 @@ class PyFSApp(tk.Tk):
             # Read items
             items = os.listdir(self.current_dir)
             
+            # Show shell-like prompt and ls -la output
+            username = os.environ.get('USER', 'user')
+            hostname = os.uname().nodename if hasattr(os, 'uname') else 'linux'
+            # Shorten home path to ~
+            home = os.path.expanduser('~')
+            display_path = self.current_dir.replace(home, '~') if self.current_dir.startswith(home) else self.current_dir
+            
+            prompt = f"\033[01;32m{username}@{hostname}\033[00m:\033[01;34m{display_path}\033[00m$ "
+            
+            try:
+                ls_output = FSManager.load_directory_ls(self.current_dir)
+                # We use a special marker to tell log_status this is a BASH simulation
+                self.log_status(f"SHELL_SIMULATE: {prompt}ls -la\n{ls_output}")
+            except Exception as e:
+                self.log_status(f"Error generating ls -la: {e}", is_error=True)
+
             # Retrieve metadata
             item_metas = []
             for item in items:
                 p = os.path.join(self.current_dir, item)
                 try:
-                    meta = FSManager.get_metadata(p)
+                    # Use silent=True to avoid polluting the terminal with internal stat calls
+                    meta = FSManager.get_metadata(p, silent=True)
                     item_metas.append(meta)
                 except Exception as e:
                     # Log failures to retrieve metadata but continue listing
@@ -1338,7 +1384,8 @@ class PyFSApp(tk.Tk):
         self.selected_item = filepath
 
         try:
-            self.selected_meta = FSManager.get_metadata(filepath)
+            # Use silent=True to avoid polluting the terminal with internal stat calls when selecting items
+            self.selected_meta = FSManager.get_metadata(filepath, silent=True)
             meta = self.selected_meta
             
             # Update labels
@@ -1594,6 +1641,12 @@ class PyFSApp(tk.Tk):
     def action_edit_file(self, view_mode: str = 'auto'):
         if not self.selected_item:
             return
+        
+        # Bug fix: Ensure we don't try to open a directory for editing
+        if os.path.isdir(self.selected_item):
+            self.go_to_path(self.selected_item)
+            return
+
         from .utils import detect_file_type
         if view_mode == 'auto' and detect_file_type(self.selected_item) == 'document':
             self.action_open_external(self.selected_item)
